@@ -6,6 +6,8 @@ import sangria.macros.derive.GraphQLOutputTypeLookup
 import com.twitter.scrooge.ThriftStruct
 
 object SangriaMacrosTest extends SangriaMacros[Unit] with App {
-  val x = deriveThriftUnion[AtomData]
+  //val x = deriveThriftStruct[Atom]
+  val x = deriveOutputTypeLookupThriftUnion[AtomData]
+  //println(x)
   //val obj = deriveThriftStruct[ChangeRecord]
 }

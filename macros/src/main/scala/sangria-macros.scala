@@ -4,19 +4,38 @@ import scala.reflect.macros._
 
 import com.twitter.scrooge.{ ThriftStruct, ThriftEnum, ThriftUnion }
 import sangria.macros.derive.GraphQLOutputTypeLookup
+import sangria.validation.IntCoercionViolation
 import sangria.schema._
 
 import scala.language.experimental.macros
 
 trait SangriaMacros[Ctx] {
+  implicit val shortType = ScalarType[Short](
+      name = "Short",
+    coerceUserInput = {
+      case s: Short => Right(s)
+      case i: Int if i.isValidShort => Right(i.toShort)
+      case x => Left(IntCoercionViolation)
+    },
+    coerceOutput = valueOutput,
+    coerceInput = {
+      case sangria.ast.IntValue(i, _, _) if i.isValidShort => Right(i.toShort)
+      case _ => Left(IntCoercionViolation)
+    }
+  )
+
   implicit def deriveOutputTypeLookupThriftStruct[T <: ThriftStruct]:
       GraphQLOutputTypeLookup[T] =
     macro MacroImpl.deriveOutputTypeLookupThriftStruct[Ctx, T]
 
-  def deriveThriftUnion[T <: ThriftUnion]: UnionType[Ctx] =
+  implicit def deriveOutputTypeLookupThriftUnion[T <: ThriftUnion with ThriftStruct]:
+      GraphQLOutputTypeLookup[T] =
+    macro MacroImpl.deriveOutputTypeLookupThriftUnion[Ctx, T]
+
+  implicit def deriveThriftUnion[T <: ThriftUnion with ThriftStruct]: UnionType[Ctx] =
     macro MacroImpl.deriveThriftUnion[Ctx, T]
 
-  def deriveThriftStruct[T <: ThriftStruct]: ObjectType[Ctx, T] =
+  implicit def deriveThriftStruct[T <: ThriftStruct]: ObjectType[Ctx, T] =
     macro MacroImpl.deriveThriftStruct[Ctx, T]
   // def deriveThriftEnum[T <: ThriftEnum]: EnumType[T] = macro MacroImpl.deriveThriftEnum[T]
 }
@@ -85,24 +104,42 @@ class MacroImpl(val c: whitebox.Context) {
       .members
       .filter(m => m.isClass && m.asType.toType <:< tType && !m.name.toString.startsWith("UnknownUnionField"))
       .map { cl =>
-      val clCompanion = cl.asType.toTypeIn(companion).companion
-      val param = clCompanion.member(TermName("apply"))
-        .asMethod.paramLists.head.head
-      val paramName = param.name.toTermName
-      val dealiased = cl.asType
-      if(dealiased.toType <:< typeOf[ThriftStruct])
-        q"""${deriveThriftStruct[Ctx, T]}"""
-      else
-        q"""_root_.scala.Predef.implicitly[_root_.shapeless.Lazy[_root_.sangria.macros.derive.GraphQLOutputTypeLookup[${dealiased}]]].value.graphqlType"""
-    }
-    q"""sangria.schema.UnionType(name = ${typeName.decodedName.toString},
-          types = ${unionTypes.toList})"""
+        val clCompanion = cl.asType.toTypeIn(companion).companion
+        val param = clCompanion.member(TermName("apply"))
+          .asMethod.paramLists.head.head
+        val dealiased = param.typeSignature.dealias
+        if(!(dealiased <:< typeOf[ThriftStruct]))
+          c.error(c.enclosingPosition, s"Union subtype $dealiased is not a thrift struct, can't create ObjectType from it")
+        q"""_root_.scala.Predef.implicitly[
+          _root_.shapeless.Lazy[_root_.sangria.schema.ObjectType[$ctxType, $dealiased]]
+        ].value"""
+        //q"""_root_.scala.Predef.implicitly[_root_.shapeless.Lazy[
+          //_root_.sangria.macros.derive.GraphQLOutputTypeLookup[${dealiased}]]
+        //].value.graphqlType"""
+      }
+          //val paramName = param.name.toTermName
+
+      //if(dealiased.toType <:< typeOf[ThriftStruct])
+        //q"""${deriveThriftStruct[Ctx, T]}"""
+      //else
+        //q"""_root_.scala.Predef.implicitly[_root_.shapeless.Lazy[_root_.sangria.macros.derive.GraphQLOutputTypeLookup[${dealiased}]]].value.graphqlType"""
+    //}
+    q"""{
+      sangria.schema.UnionType[$ctxType](name = ${typeName.decodedName.toString}, types = ${unionTypes.toList})
+    }"""
   }
 
   def deriveOutputTypeLookupThriftStruct[Ctx: c.WeakTypeTag, T: c.WeakTypeTag] = {
     val tType = weakTypeOf[T]
     q"""new sangria.macros.derive.GraphQLOutputTypeLookup[$tType] {
           def graphqlType = ${deriveThriftStruct[Ctx, T]}
+        }"""
+  }
+
+  def deriveOutputTypeLookupThriftUnion[Ctx: c.WeakTypeTag, T: c.WeakTypeTag] = {
+    val tType = weakTypeOf[T]
+    q"""new sangria.macros.derive.GraphQLOutputTypeLookup[$tType] {
+          def graphqlType = ${deriveThriftUnion[Ctx, T]}
         }"""
   }
 
