@@ -9,7 +9,9 @@ import sangria.schema._
 
 import scala.language.experimental.macros
 
-trait SangriaMacros[Ctx] {
+object SangriaMacros {
+  type Ctx = Unit
+
   implicit val shortType = ScalarType[Short](
       name = "Short",
     coerceUserInput = {
@@ -24,25 +26,48 @@ trait SangriaMacros[Ctx] {
     }
   )
 
-  implicit def deriveOutputTypeLookupThriftStruct[T <: ThriftStruct]:
-      GraphQLOutputTypeLookup[T] =
-    macro MacroImpl.deriveOutputTypeLookupThriftStruct[Ctx, T]
+  //def deriveOutputTypeLookupThriftStruct[Ctx, T <: ThriftStruct]:
+      //GraphQLOutputTypeLookup[T] =
+    //macro MacroImpl.deriveOutputTypeLookupThriftStruct[Ctx, T]
 
-  implicit def deriveOutputTypeLookupThriftUnion[T <: ThriftUnion with ThriftStruct]:
-      GraphQLOutputTypeLookup[T] =
-    macro MacroImpl.deriveOutputTypeLookupThriftUnion[Ctx, T]
+  //def deriveOutputTypeLookupThriftUnion[Ctx, T <: ThriftUnion with ThriftStruct]:
+      //GraphQLOutputTypeLookup[T] =
+    //macro MacroImpl.deriveOutputTypeLookupThriftUnion[Ctx, T]
 
-  implicit def deriveThriftUnion[T <: ThriftUnion with ThriftStruct]: UnionType[Ctx] =
-    macro MacroImpl.deriveThriftUnion[Ctx, T]
+  implicit def deriveThriftUnion[T <: ThriftUnion with ThriftStruct]:
+      GraphQLOutputTypeLookup[T] = macro MacroImpl.deriveThriftUnion[Ctx, T]
 
   implicit def deriveThriftStruct[T <: ThriftStruct]: ObjectType[Ctx, T] =
     macro MacroImpl.deriveThriftStruct[Ctx, T]
-  // def deriveThriftEnum[T <: ThriftEnum]: EnumType[T] = macro MacroImpl.deriveThriftEnum[T]
+
+  implicit def deriveThriftStructLookup[T <: ThriftStruct]: GraphQLOutputTypeLookup[T] =
+    macro MacroImpl.deriveThriftStructLookup[Ctx, T]
+
+  implicit def deriveThriftEnum[T <: ThriftEnum]: GraphQLOutputTypeLookup[T] =
+    macro MacroImpl.deriveThriftEnum[T]
+
+  // annoyingly, UnionType[T] is not an OutputType[T], but an OutputType[Any]
+  // (is there is not neccessarily any relation between the types of the union
+  // fields). So in order to produce an OutputType[T] in the case of a
+  // UnionType, we are here stashing it within an ObjectType.
+  //implicit def outputTypeLookupThriftUnion[T <: ThriftUnion with ThriftStruct] =
+    //new sangria.macros.derive.GraphQLOutputTypeLookup[T] {
+        //lazy val unionType = ${deriveThriftUnion[Ctx, T]}
+        //def graphqlType = sangria.schema.ObjectType(
+          //name = unionType.name,
+          //fields = List()
+        //)
+      //}
+    //"""
+    //println(showCode(res))
+    //res
+  //}
+
 }
 
-// whitebox means: if we can't apply this macro in the implicit
-// definition, then just ignore it, rather than throw an error
-// message:
+// I am using whitebox here because it has the property that: if we
+// can't apply this macro in the implicit definition, then just ignore
+// it, rather than throw an error message:
 //
 //   "When an application of a blackbox macro is used as an implicit
 //   candidate, no expansion is performed until the macro is selected
@@ -67,6 +92,24 @@ trait SangriaMacros[Ctx] {
 // the implicit resolution fails.
 //
 // ... Or something like that. Macros are mysterious.
+// 
+// possibly I am thinking of this wrong here. What is actually
+// happening is that a Blackbox macro is saying that its
+// implementation doesn't do anything 'wierd', and therefore, the
+// signature that is declared by the definition is and always will be
+// the correct signature after the code has been expanded and
+// compiled. Therefore we can make conclusions, such as whether an
+// implicit is applicable, without having to expand the macro (and
+// execute the code in the macro code).
+//
+// On the other hand, a whitebox macro might muck around with stuff,
+// and so the type signature on the macro def is just a guide. In
+// order for the compile to actually understand the type signature, it
+// has to expand and then compile the macro. And so it expands the
+// macro and compiles the result. It is up to the macro itself,
+// therefore, to make sure that the code that is generating is
+// sensible, e.g. to check the types and throw an error if it isn't
+// correct.
 
 // class MacroImpl(val c: whitebox.Context) {
 //   import c.universe._
@@ -77,6 +120,10 @@ class MacroImpl(val c: whitebox.Context) {
   def deriveThriftStruct[Ctx : c.WeakTypeTag, T: c.WeakTypeTag] = {
     val ctxType = weakTypeOf[Ctx]
     val tType   = weakTypeOf[T]
+    println(s"[PMR 1444] $tType")
+    if (!(tType <:< typeOf[ThriftStruct])) {
+      c.abort(c.enclosingPosition, "Not a ThriftStruct")
+    }
 
     val typeName = tType.typeSymbol.name.toTypeName
 
@@ -97,6 +144,11 @@ class MacroImpl(val c: whitebox.Context) {
   def deriveThriftUnion[Ctx : c.WeakTypeTag, T: c.WeakTypeTag] = {
     val ctxType = weakTypeOf[Ctx]
     val tType   = weakTypeOf[T]
+
+    if (!(tType <:< typeOf[ThriftUnion])) {
+      c.abort(c.enclosingPosition, "Not a ThriftUnion")
+    }
+
     val typeName = tType.typeSymbol.name.toTypeName
 
     val companion = tType.companion
@@ -124,25 +176,28 @@ class MacroImpl(val c: whitebox.Context) {
       //else
         //q"""_root_.scala.Predef.implicitly[_root_.shapeless.Lazy[_root_.sangria.macros.derive.GraphQLOutputTypeLookup[${dealiased}]]].value.graphqlType"""
     //}
-    q"""{
-      sangria.schema.UnionType[$ctxType](name = ${typeName.decodedName.toString}, types = ${unionTypes.toList})
+    q"""new _root_.sangria.macros.derive.GraphQLOutputTypeLookup[$tType] {
+      def graphqlType = _root_.sangria.schema.UnionType[$ctxType](name = ${typeName.decodedName.toString}, types = ${unionTypes.toList})
     }"""
   }
 
-  def deriveOutputTypeLookupThriftStruct[Ctx: c.WeakTypeTag, T: c.WeakTypeTag] = {
+  def deriveThriftStructLookup[Ctx: c.WeakTypeTag, T: c.WeakTypeTag] = {
     val tType = weakTypeOf[T]
-    q"""new sangria.macros.derive.GraphQLOutputTypeLookup[$tType] {
-          def graphqlType = ${deriveThriftStruct[Ctx, T]}
-        }"""
+    q"""
+      new sangria.macros.derive.GraphQLOutputTypeLookup[$tType] {
+        def graphqlType = ${deriveThriftStruct[Ctx, T]}
+      }
+    """
   }
 
-  def deriveOutputTypeLookupThriftUnion[Ctx: c.WeakTypeTag, T: c.WeakTypeTag] = {
+  def deriveThriftEnum[T: c.WeakTypeTag] = {
     val tType = weakTypeOf[T]
-    q"""new sangria.macros.derive.GraphQLOutputTypeLookup[$tType] {
-          def graphqlType = ${deriveThriftUnion[Ctx, T]}
-        }"""
+      if (!(tType <:< typeOf[ThriftEnum]))
+        c.abort(c.enclosingPosition, "Not a ThriftEnum")
+    val typeName = tType.typeSymbol.name.toTypeName
+    println(s"[PMR 11:02] $tType")
+    q"""new _root_.sangria.macros.derive.GraphQLOutputTypeLookup[$tType] {
+      def graphqlType = _root_.sangria.schema.EnumType[$tType](name = ${typeName.decodedName.toString}, values = _root_.scala.collection.immutable.List())
+    }"""
   }
-
-  //def deriveThriftEnum[T: c.WeakTypeTag] = {
-  //}
 }
