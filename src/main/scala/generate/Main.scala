@@ -11,6 +11,11 @@ object Main {
     //val importer = new ResourceImporter() +: new ResourceImporter("/atoms/")
     val thriftParser = new ThriftParser(importer, false)
     val doc = thriftParser.parseFile("contentatom.thrift")
-    println(doc)
+    val generator = new SangriaScroogeGenerator
+    doc.structs.headOption.foreach( st =>
+      println(
+        generator.generateStruct(st).syntax
+      )
+    )
   }
 }

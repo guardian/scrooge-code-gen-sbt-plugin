@@ -1,6 +1,6 @@
 package com.gu.sangriascrooge.generate
 
-import java.net.File
+import java.io.File
 import scala.io.Source
 import com.twitter.scrooge.frontend.{ Importer, FileContents }
 
@@ -12,7 +12,8 @@ class ResourceImporter(basePath: File = new File("/")) extends Importer {
   private lazy val cl = this.getClass
 
   /* Option(x) returns None if x is null */
-  private def resource(path: File) = { println(s"$basePath$path"); Option(cl.getResource(s"$basePath$path")) }
+  private def resource(path: String) =
+    Option(cl.getResource(s"$basePath$path"))
 
   lazy val canonicalPaths = Seq()
   def apply(path: String): Option[FileContents] = {
