@@ -1,7 +1,11 @@
 package com.gu.sangriascrooge.generate
 
 import java.io.File
-import com.twitter.scrooge.frontend.{ Importer, ThriftParser }
+import com.twitter.scrooge.frontend.{
+  Importer,
+  ThriftParser,
+  TypeResolver
+}
 
 object Main {
   def main(args: Array[String]) { 
@@ -10,9 +14,10 @@ object Main {
     //val importer = new ZipImporter(new java.io.File(fname))
     //val importer = new ResourceImporter() +: new ResourceImporter("/atoms/")
     val thriftParser = new ThriftParser(importer, false)
-    val doc = thriftParser.parseFile("contentatom.thrift")
+    val doc = thriftParser.parseFile("simple.thrift")
+    val resolvedDoc = TypeResolver()(doc)
     val generator = new SangriaScroogeGenerator
-    doc.structs.headOption.foreach( st =>
+    resolvedDoc.document.structs.headOption.foreach( st =>
       println(
         generator.generateStruct(st).syntax
       )
