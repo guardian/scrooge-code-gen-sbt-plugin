@@ -1,11 +1,9 @@
 package com.gu.sangriascrooge.generate
 import org.scalafmt.Scalafmt
 import java.io.PrintStream
-import com.twitter.scrooge.frontend.{
-  Importer,
-  ThriftParser,
-  TypeResolver
-}
+
+import com.gu.scala.generate.CaseClassGenerator
+import com.twitter.scrooge.frontend.{Importer, ThriftParser, TypeResolver}
 
 object Main {
   def main(args: Array[String]) { 
@@ -15,7 +13,10 @@ object Main {
     val thriftParser = new ThriftParser(importer, false)
     val doc = thriftParser.parseFile("contentatom.thrift")
     val resolvedDoc = TypeResolver()(doc)
-    val srcCode = (new SangriaScroogeGenerator).generate("ContentAtom", resolvedDoc.document)
+
+    val srcCode = (new CaseClassGenerator).generate(resolvedDoc.document)
+
+
     output.println(
       Scalafmt.format(srcCode.syntax).get
     )
