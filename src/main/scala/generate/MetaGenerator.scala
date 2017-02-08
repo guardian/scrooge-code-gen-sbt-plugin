@@ -1,4 +1,4 @@
-package com.gu.scala.generate
+package com.gu.thrifttransformer.generate
 
 import com.twitter.scrooge.ast.{ListType, NamedType, ReferenceType, _}
 //import com.twitter.scrooge.backend.ScalaGeneratorFactory
