@@ -55,11 +55,12 @@ class CaseClassGenerator() {
     ImmutableSeq(fields:_*)
   }
 
-  def generate(doc:Document): Seq[Tree] = {
-    ImmutableSeq(doc.structs:_*).map{st =>
+  def generate(packageName: String, doc:Document): Tree = {
+    val caseClasses = ImmutableSeq(doc.structs:_*).map{st =>
       val name = Type.Name(st.sid.name)
       val members = generateMembers(st)
       q"""case class ${name}(..${members})"""
     }
+    q"""package ${Term.Name(packageName)} { ..$caseClasses }"""
   }
 }
