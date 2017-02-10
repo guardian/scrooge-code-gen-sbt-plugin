@@ -2,9 +2,9 @@ package com.gu.thrifttransformer.generate
 
 import java.io.{ InputStream, InputStreamReader }
 
-import com.twitter.scrooge.frontend.Importer
+import com.twitter.scrooge.frontend.{ FileContents, Importer }
 
-class ResourceImporter extends Importer {
+class ResourceImporter(basePath: String = "") extends Importer {
   lazy val canonicalPaths: Seq[String] = Seq()
 
   private def readAll(inStream: InputStream): String = {
@@ -14,7 +14,7 @@ class ResourceImporter extends Importer {
     val charBuffer = new Array[Char](bufSize)
     var count = 0
     while(count >= 0) {
-      val count = in.read(charBuffer)
+      count = in.read(charBuffer)
       if(count > 0)
         sb ++= charBuffer.take(count)
     }
@@ -22,10 +22,10 @@ class ResourceImporter extends Importer {
   }
 
   def apply(v1: String) = {
-    Option(this.getClass.getResourceAsStream(v1)).map { in =>
-
+    val fileName = basePath + "/" + v1
+    Option(this.getClass.getResourceAsStream(fileName)).map { in =>
+      FileContents(this, readAll(in), Some(v1))
     }
-    None
   }
   def lastModified(filename: String): Option[Long] = None
 }
