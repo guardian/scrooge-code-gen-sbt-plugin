@@ -46,8 +46,11 @@ class MetaGeneratorSpec extends FunSpec with Matchers with Inside {
           )
       }
     }
-    it("should print (it shouldn't)") {
-      println(generator.generatePackage(Identifier("SimpleTest"), document).generate)
+    it("it should generate package with multiple structs") {
+      inside(generator.generatePackage(Identifier("SimpleTest"), document)) {
+        case GeneratedPackage(Identifier("SimpleTest"), caseClasses) =>
+          caseClasses should have size 2
+      }
     }
   }
 }
