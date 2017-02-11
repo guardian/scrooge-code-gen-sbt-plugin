@@ -4,6 +4,9 @@
 
 package com.gu.thrifttransformer.sbt
 
+import com.gu.thrifttransformer.generate._
+import com.twitter.scrooge.frontend._
+
 import sbt._
 import Keys._
 
@@ -17,14 +20,24 @@ object ThriftTransformerSBT extends AutoPlugin {
   }
   import autoImport._
 
+  //def parseThriftFile(f: File): ResolvedDocument = {
+    //val parser = new ThriftParser(new ResourceImporter("/example-thrift"), false)
+    //val resolver = new TypeResolver()
+    //resolver(parser.parseFile("simple.thrift"))
+  //}
+
   override lazy val trigger = allRequirements
-  override lazy val requires = sbt.plugins.JvmPlugin
+  override lazy val requires = empty
   override lazy val buildSettings = Seq(
     thriftTransformPackageName := "ThriftTransformed",
     thriftTransformThriftDirs  := Seq(),
     thriftTransformThriftFiles := Seq(),
     generateTransformedThrift  := {
-      println("transforming ...")
+      val importer = Importer(thriftTransformThriftDirs.value.map(_.getCanonicalPath))
+      val parser = new ThriftParser(importer, false)
+      val resolver = new TypeResolver()
+      val docs = thriftTransformThriftFiles.value.map(f => resolver(parser.parseFile(f.getCanonicalPath)))
+      println(docs)
       Seq()
     }
   )
