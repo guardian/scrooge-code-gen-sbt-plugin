@@ -1,11 +1,12 @@
 package com.gu.thrifttransformer.generate
 
-import org.scalatest.{ FunSpec, Matchers }
+import scala.collection.immutable.SortedSet
+import org.scalatest.{ FunSpec, Matchers, Inside }
 
 import com.twitter.scrooge.frontend.{ ThriftParser, TypeResolver }
 import com.twitter.scrooge.{ ast => scroogeAst }
 
-class MetaGeneratorSpec extends FunSpec with Matchers {
+class MetaGeneratorSpec extends FunSpec with Matchers with Inside {
 
   lazy val resolvedDocument =  {
     val parser = new ThriftParser(new ResourceImporter("/example-thrift"), false)
@@ -33,19 +34,20 @@ class MetaGeneratorSpec extends FunSpec with Matchers {
     }
     it("should correctly generate field") {
       generator.generateField(ageField) should matchPattern {
-        case GeneratedField(Identifier("age"), ScalaType.Int) =>
+        case GeneratedField(Identifier("age"), ScalaType.Int, 2) =>
       }
     }
     it("should correctly identify fields") {
-      generator.generateCaseClass(simpleStruct) should matchPattern {
-        case GeneratedCaseClass(
-          Identifier("SimpleStruct"),
-          Seq(GeneratedField(Identifier("name"), ScalaType.String),
-            GeneratedField(Identifier("age"), ScalaType.Int))) =>
+      inside(generator.generateCaseClass(simpleStruct)) {
+        case GeneratedCaseClass(Identifier("SimpleStruct"), fields) =>
+          fields should contain inOrderOnly (
+            GeneratedField(Identifier("name"), ScalaType.String, 1),
+            GeneratedField(Identifier("age"), ScalaType.Int, 2)
+          )
       }
     }
     it("should print (it shouldn't)") {
-      println(generator.generatePackage(document).generate)
+      println(generator.generatePackage(Identifier("SimpleTest"), document).generate)
     }
   }
 }

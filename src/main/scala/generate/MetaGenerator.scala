@@ -1,5 +1,6 @@
 package com.gu.thrifttransformer.generate
 
+import scala.collection.immutable.SortedSet
 import com.twitter.scrooge.ast.{ListType, NamedType, ReferenceType, _}
 import com.twitter.scrooge.{ast => scroogeAst}
 
@@ -27,6 +28,10 @@ object ScalaType extends Enumeration {
 case class GeneratedField(name: Identifier, scalaType: ScalaType.Value, fieldId: Int) extends GeneratedCode {
   val generate = s"${name.generate}: Option[${scalaType}] = None"
 }
+object GeneratedField {
+  /* sort fields by thier numeric field id */
+  implicit val ordering = Ordering.by[GeneratedField, Int](_.fieldId)
+}
 
 case class GeneratedCaseClass(name: Identifier, fields: SortedSet[GeneratedField]) extends GeneratedDefinition {
   val fieldsString = fields.map(_.generate).mkString(",")
@@ -52,9 +57,11 @@ class CaseClassGenerator() {
   }
 
   def generateField(field: scroogeAst.Field): GeneratedField =
-    GeneratedField(Identifier(field.originalName), genType(field.fieldType))
+    GeneratedField(name = Identifier(field.originalName),
+      scalaType = genType(field.fieldType),
+      fieldId = field.index)
 
-  def generateMembers(st: StructLike): Seq[GeneratedField] = st.fields.map(generateField)
+  def generateMembers(st: StructLike): SortedSet[GeneratedField] = SortedSet(st.fields.map(generateField):_*)
 
   def generateCaseClass(st: StructLike): GeneratedCaseClass = {
     val name = st.sid.name
