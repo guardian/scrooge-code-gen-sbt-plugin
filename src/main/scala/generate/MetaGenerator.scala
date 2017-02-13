@@ -43,7 +43,7 @@ case class GeneratedPackage(name: Identifier, definitions: Seq[GeneratedDefiniti
   val generate = s"package ${name.generate} { $definitionsString }"
 }
 
-class CaseClassGenerator() {
+class CaseClassGenerator(val packageName: Identifier) {
 
   def genType(t: FunctionType): ScalaType.Value = t match {
     case TBool => ScalaType.Boolean
@@ -69,7 +69,7 @@ class CaseClassGenerator() {
       GeneratedCaseClass(Identifier(name), members)
   }
 
-  def generatePackage(packageName: Identifier, doc:Document): GeneratedPackage = {
+  def generatePackage(doc:Document): GeneratedPackage = {
     val caseClasses = doc.structs.map(generateCaseClass)
     GeneratedPackage(packageName, caseClasses)
 
