@@ -1,6 +1,6 @@
 package com.gu.thrifttransformer.generate
 
-import java.io.{ InputStream, InputStreamReader }
+import java.io.{ InputStream, InputStreamReader, File }
 
 import com.twitter.scrooge.frontend.{ FileContents, Importer }
 
@@ -22,9 +22,15 @@ class ResourceImporter(basePath: String = "") extends Importer {
   }
 
   def apply(v1: String) = {
-    val fileName = basePath + "/" + v1
+    val file = new File(new File(basePath), v1)
+    val fileName = file.getCanonicalPath
+    val parent = file.getParentFile.getCanonicalPath
+    val importer = if(parent != "/") {
+      println(s"Adding ${parent}")
+      new ResourceImporter(parent) +: this
+    } else this
     Option(this.getClass.getResourceAsStream(fileName)).map { in =>
-      FileContents(this, readAll(in), Some(v1))
+      FileContents(importer, readAll(in), Some(v1))
     }
   }
   def lastModified(filename: String): Option[Long] = None

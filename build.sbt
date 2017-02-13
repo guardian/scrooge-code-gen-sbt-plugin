@@ -10,6 +10,6 @@ version := "0.0.1-SNAPSHOT"
 
 libraryDependencies ++= Seq(
   "com.twitter"         %% "scrooge-generator"         % "4.13.0",
-  "com.gu"               % "content-atom-model-thrift" % "2.4.31",
-  "org.scalatest"       %% "scalatest"                 % "3.0.1" % "test"
+  "org.scalatest"       %% "scalatest"                 % "3.0.1"  % "test",
+  "com.gu"               % "content-atom-model-thrift" % "2.4.31" % "test"
 )
