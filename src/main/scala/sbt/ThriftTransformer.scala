@@ -20,24 +20,19 @@ object ThriftTransformerSBT extends AutoPlugin {
   }
   import autoImport._
 
-  //def parseThriftFile(f: File): ResolvedDocument = {
-    //val parser = new ThriftParser(new ResourceImporter("/example-thrift"), false)
-    //val resolver = new TypeResolver()
-    //resolver(parser.parseFile("simple.thrift"))
-  //}
-
   override lazy val trigger = allRequirements
   override lazy val requires = empty
-  override lazy val buildSettings = Seq(
-    thriftTransformPackageName := "ThriftTransformed",
-    thriftTransformThriftDirs  := Seq(),
-    thriftTransformThriftFiles := Seq(),
+  override lazy val projectSettings = Seq(
+    thriftTransformPackageName := "thrift_transformed",
+    thriftTransformThriftDirs  := Seq(baseDirectory.value / "src" / "main" / "thrift"),
+    thriftTransformThriftFiles := Seq(file("set_in_scala_repo")),
     generateTransformedThrift  := {
       val importer = Importer(thriftTransformThriftDirs.value.map(_.getCanonicalPath))
       val parser = new ThriftParser(importer, false)
       val resolver = new TypeResolver()
-      val docs = thriftTransformThriftFiles.value.map(f => resolver(parser.parseFile(f.getCanonicalPath)))
-      println(docs)
+      val docs = thriftTransformThriftFiles.value.map { f =>
+        resolver(parser.parseFile(f.getPath))
+      }
       Seq()
     }
   )
