@@ -26,7 +26,7 @@ class MetaGeneratorSpec extends FunSpec with Matchers with Inside {
   lazy val nameField    = findField("name", simpleStruct).get
   lazy val ageField     = findField("age", simpleStruct).get
 
-  lazy val generator = new CaseClassGenerator()
+  lazy val generator = new CaseClassGenerator(Identifier("SimpleTest"))
 
   describe("MetaGenerator") {
     it("should correctly choose field type") {
@@ -47,7 +47,7 @@ class MetaGeneratorSpec extends FunSpec with Matchers with Inside {
       }
     }
     it("it should generate package with multiple structs") {
-      inside(generator.generatePackage(Identifier("SimpleTest"), document)) {
+      inside(generator.generatePackage(document)) {
         case GeneratedPackage(Identifier("SimpleTest"), caseClasses) =>
           caseClasses should have size 2
       }
