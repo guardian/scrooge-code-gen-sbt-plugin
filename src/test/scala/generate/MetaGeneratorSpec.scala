@@ -1,5 +1,6 @@
 package com.gu.thrifttransformer.generate
 
+import com.gu.thrifttransformer.sbt.ResourceImporter
 import scala.collection.immutable.SortedSet
 import org.scalatest.{ FunSpec, Matchers, Inside }
 

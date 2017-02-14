@@ -1,4 +1,4 @@
-package com.gu.thrifttransformer.generate
+package com.gu.thrifttransformer.sbt
 
 import java.io.{ InputStream, InputStreamReader, File }
 
