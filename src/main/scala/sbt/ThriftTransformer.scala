@@ -9,6 +9,7 @@ import com.twitter.scrooge.frontend._
 import java.io.PrintStream
 
 import sbt._
+import classpath.ClasspathUtilities.toLoader
 import Keys._
 
 object ThriftTransformerSBT extends AutoPlugin {
@@ -34,6 +35,9 @@ object ThriftTransformerSBT extends AutoPlugin {
     thriftTransformSourceDir    := sourceManaged.value / "thriftTransform" / "src",
     thriftTransformUseClassPath := true,
     generateTransformedThrift   := {
+      (dependencyClasspath in Compile).value.files.foreach { f => println(f) }
+      //val classLoader = toLoader((dependencyClasspath in Compile).value.files)
+      //println("[PMR 16:42] " + classLoader.getResource("/example-thrift/simple.thrift"))
       val importer = Importer(thriftTransformThriftDirs.value.map(_.getCanonicalPath)) +:
         (if(thriftTransformUseClassPath.value) new ResourceImporter else NullImporter)
       val parser = new ThriftParser(importer, false)
