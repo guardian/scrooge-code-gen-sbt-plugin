@@ -26,6 +26,14 @@ object ThriftTransformerSBT extends AutoPlugin {
   }
   import autoImport._
 
+  def buildClasspathImporter(jars: Seq[File]): Importer = jars.map { fname =>
+      val fs = FileSystems.newFileSystem(URI.create(s"jar:file://$fname"), new java.util.HashMap[String, Any]())
+      println(s"[PMR 1703] importer: ${fname}")
+      val i = new ZipImporter(fname)
+      fs.close()
+      i
+    }.foldLeft(NullImporter: Importer)((acc, i) => i +: acc)
+
   // sourceGenerators gets reset when Jvm Plugin starts, so we want to start
   // after that
   // <http://stackoverflow.com/questions/24724406/how-to-generate-sources-in-an-sbt-plugin?rq=1>
@@ -38,14 +46,10 @@ object ThriftTransformerSBT extends AutoPlugin {
     thriftTransformSourceDir    := sourceManaged.value / "thriftTransform" / "src",
     thriftTransformUseClassPath := true,
     generateTransformedThrift   := {
-      val classpathImporter = managedJars(Compile, classpathTypes.value, update.value)
-        .map { jarFile =>
-          val fname = jarFile.data
-          val fs = FileSystems.newFileSystem(URI.create(s"jar:file://$fname"), new java.util.HashMap[String, Any]())
-          ImporterWithBasePath(new ZipImporter(fname), fs.getPath(""))
-          //NullImporter
-        }
-        .foldLeft(NullImporter: Importer)((acc, i) => i +: acc)
+      val classpathImporter = if(thriftTransformUseClassPath.value)
+          buildClasspathImporter(managedJars(Compile, classpathTypes.value, update.value).map(_.data))
+        else
+          NullImporter
       val importer = Importer(thriftTransformThriftDirs.value.map(_.getCanonicalPath)) +: classpathImporter
       val parser = new ThriftParser(importer, false)
       val resolver = new TypeResolver()
@@ -55,7 +59,7 @@ object ThriftTransformerSBT extends AutoPlugin {
       }
       val srcFiles = docs.map(resolvedDoc => generator.generatePackage(resolvedDoc.document))
       // write each document out to a file, returning the filename (as File())
-      srcFiles.map { srcFile =>
+      srcFiles map { srcFile =>
         val fname = thriftTransformSourceDir.value / (thriftTransformPackageName.value + ".scala")
         fname.getParentFile.mkdirs()
         val out = new PrintStream(fname)
