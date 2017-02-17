@@ -28,6 +28,7 @@ object ScalaType extends Enumeration {
 case class GeneratedField(name: Identifier, scalaType: ScalaType.Value, fieldId: Int) extends GeneratedCode {
   val generate = s"${name.generate}: Option[${scalaType}] = None"
 }
+
 object GeneratedField {
   /* sort fields by thier numeric field id */
   implicit val ordering = Ordering.by[GeneratedField, Int](_.fieldId)

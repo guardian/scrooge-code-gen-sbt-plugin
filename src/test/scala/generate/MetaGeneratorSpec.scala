@@ -1,6 +1,6 @@
 package com.gu.thrifttransformer.generate
 
-import com.gu.thrifttransformer.sbt.ResourceImporter
+import com.gu.thrifttransformer.sbt._
 import scala.collection.immutable.SortedSet
 import org.scalatest.{ FunSpec, Matchers, Inside }
 
@@ -10,9 +10,9 @@ import com.twitter.scrooge.{ ast => scroogeAst }
 class MetaGeneratorSpec extends FunSpec with Matchers with Inside {
 
   lazy val resolvedDocument =  {
-    val parser = new ThriftParser(new ResourceImporter("/example-thrift"), false)
+    val parser = new ThriftParser(new ResourceImporter(), false)
     val resolver = new TypeResolver()
-    resolver(parser.parseFile("simple.thrift"))
+    resolver(parser.parseFile("/example-thrift/simple.thrift"))
   }
 
   lazy val document = resolvedDocument.document

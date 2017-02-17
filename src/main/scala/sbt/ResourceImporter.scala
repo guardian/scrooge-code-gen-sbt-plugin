@@ -1,10 +1,37 @@
 package com.gu.thrifttransformer.sbt
 
+import java.nio.file.Path
 import java.io.{ InputStream, InputStreamReader, File }
 
-import com.twitter.scrooge.frontend.{ FileContents, Importer }
+import com.twitter.scrooge.frontend.{ FileContents, Importer, ZipImporter }
 
-class ResourceImporter(basePath: String = "") extends Importer {
+/**
+  *  I need a layer that sits on top of the ZipImporter, and which collapses the file paths into a canonical path branched of the current file
+  */
+
+// canonicalises a path against a basePath before passing it to the wrapped importer
+case class ImporterWithBasePath(delegatedImporter: Importer, basePath: Path) extends Importer {
+  // returns a multi-importer that includes this one and a new
+  // basePath, both using the same underlying importer
+  def addPath(newPath: Path): Importer = this +: this.copy(basePath = newPath)
+
+  private def resolveFileName(inputFileName:String): (Importer, String) = {
+    val filePath = basePath.resolve(inputFileName).normalize
+    val parent = filePath.getParent
+    val importer = if(parent != "/") addPath(parent) else this
+    (importer, filePath.toString)
+  }
+
+  def apply(fileName: String) = {
+    val (importer, resolvedFileName) = resolveFileName(fileName)
+    delegatedImporter(resolvedFileName).map(_.copy(importer = importer))
+  }
+
+  val canonicalPaths = Seq()
+  def lastModified(fileName: String) = delegatedImporter.lastModified(resolveFileName(fileName)._2)
+}
+
+class ResourceImporter() extends Importer {
   lazy val canonicalPaths: Seq[String] = Seq()
 
   private def readAll(inStream: InputStream): String = {
@@ -21,17 +48,27 @@ class ResourceImporter(basePath: String = "") extends Importer {
     sb.toString
   }
 
-  def apply(v1: String) = {
-    val file = new File(new File(basePath), v1)
-    val fileName = file.getCanonicalPath
-    val parent = file.getParentFile.getCanonicalPath
-    val importer = if(parent != "/") {
-      println(s"Adding ${parent}")
-      new ResourceImporter(parent) +: this
-    } else this
-    Option(this.getClass.getResourceAsStream(fileName)).map { in =>
-      FileContents(importer, readAll(in), Some(v1))
+  def apply(fileName: String) = Option(this.getClass.getResourceAsStream(fileName))
+    .map { in =>
+      FileContents(this, readAll(in), Some(fileName))
     }
-  }
   def lastModified(filename: String): Option[Long] = None
 }
+
+// class JarImporter(basePath: String = "", zipFile: File) extends Importer {
+//   val zipImporter = new ZipImporter(zipFile)
+
+//   lazy val canonicalPaths: Seq[String] = Seq()
+
+//   def apply(inputFileName: String) = {
+//     val file = new File(new File(basePath), inputFileName)
+//     val fileName = file.getCanonicalPath
+//     val parent = file.getParentFile.getCanonicalPath
+//     val importer = if(parent != "/") {
+//       println(s"Adding ${parent}")
+//       new JarImporter(parent, zipFile) +: this
+//     } else this
+//     zipImporter(fileName).map(_.copy(importer = importer))
+//   }
+//   def lastModified(filename: String): Option[Long] = None
+// }

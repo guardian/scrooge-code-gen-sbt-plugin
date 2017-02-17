@@ -8,6 +8,9 @@ import com.gu.thrifttransformer.generate._
 import com.twitter.scrooge.frontend._
 import java.io.PrintStream
 
+import java.nio.file.FileSystems
+import java.net.URI
+
 import sbt._
 import Keys._
 import Classpaths.managedJars
@@ -36,8 +39,13 @@ object ThriftTransformerSBT extends AutoPlugin {
     thriftTransformUseClassPath := true,
     generateTransformedThrift   := {
       val classpathImporter = managedJars(Compile, classpathTypes.value, update.value)
-        .map(j => new ZipImporter(j.data))
-        .foldLeft(NullImporter: Importer)(acc, i) => i +: acc)
+        .map { jarFile =>
+          val fname = jarFile.data
+          val fs = FileSystems.newFileSystem(URI.create(s"jar:file://$fname"), new java.util.HashMap[String, Any]())
+          ImporterWithBasePath(new ZipImporter(fname), fs.getPath(""))
+          //NullImporter
+        }
+        .foldLeft(NullImporter: Importer)((acc, i) => i +: acc)
       val importer = Importer(thriftTransformThriftDirs.value.map(_.getCanonicalPath)) +: classpathImporter
       val parser = new ThriftParser(importer, false)
       val resolver = new TypeResolver()
