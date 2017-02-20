@@ -9,7 +9,7 @@ scriptedLaunchOpts := { scriptedLaunchOpts.value ++
     Seq("-Xmx1024M", "-XX:MaxPermSize=256M", "-Dplugin.version=" + version.value)
 }
 
-// by default, hide the verbose output of the scripted tests (only
-// shows output if there's an error) but for debugging you might wish
-// to switch this off
+// by default this is `false`, which means hide the verbose output of
+// the scripted tests (only shows output if there's an error) but for
+// debugging you might wish to switch this off
 scriptedBufferLog := true

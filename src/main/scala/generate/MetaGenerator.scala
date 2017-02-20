@@ -54,7 +54,7 @@ class CaseClassGenerator(val packageName: Identifier) {
     case TI64 => ScalaType.Long
     case TDouble => ScalaType.Double
     case TString => ScalaType.String
-    case _ => throw new IllegalArgumentException()
+    case _ => throw new IllegalArgumentException(s"Unrecognised type $t")
   }
 
   def generateField(field: scroogeAst.Field): GeneratedField =
