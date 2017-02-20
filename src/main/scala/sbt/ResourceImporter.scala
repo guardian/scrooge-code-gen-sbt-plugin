@@ -1,24 +1,33 @@
 package com.gu.thrifttransformer.sbt
 
-import java.nio.file.Path
+import java.nio.file.{ FileSystem, Path }
 import java.io.{ InputStream, InputStreamReader, File }
 
 import com.twitter.scrooge.frontend.{ FileContents, Importer, ZipImporter }
 
 /**
-  *  I need a layer that sits on top of the ZipImporter, and which collapses the file paths into a canonical path branched of the current file
+  *  I need a layer that sits on top of the ZipImporter, and which
+  *  collapses the file paths into a canonical path branched of the
+  *  current file
   */
 
-// canonicalises a path against a basePath before passing it to the wrapped importer
-case class ImporterWithBasePath(delegatedImporter: Importer, basePath: Path) extends Importer {
+/**
+  * Canonicalises a path against a basePath before passing it to the
+  *  wrapped importer.  The root (in other words, the case when no
+  *  change to the path is required) is expressed by no path at all.
+  */
+case class ImporterWithBasePath(delegatedImporter: Importer, fs: FileSystem, basePath: Option[Path] = None) extends Importer {
   // returns a multi-importer that includes this one and a new
   // basePath, both using the same underlying importer
-  def addPath(newPath: Path): Importer = this +: this.copy(basePath = newPath)
+  def addPath(newPath: Path): Importer = this +: this.copy(basePath = Some(newPath))
 
   private def resolveFileName(inputFileName:String): (Importer, String) = {
-    val filePath = basePath.resolve(inputFileName).normalize
+    val filePath: Path = basePath match {
+        case Some(basePath) => basePath.resolve(inputFileName).normalize
+        case None => fs.getPath(inputFileName)
+      }
     val parent = filePath.getParent
-    val importer = if(parent != "/") addPath(parent) else this
+    val importer = if(parent != null) addPath(parent) else this
     (importer, filePath.toString)
   }
 

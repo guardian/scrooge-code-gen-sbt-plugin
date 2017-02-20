@@ -8,7 +8,7 @@ import com.gu.thrifttransformer.generate._
 import com.twitter.scrooge.frontend._
 import java.io.PrintStream
 
-import java.nio.file.FileSystems
+import java.nio.file.{ FileSystems, FileSystem, FileSystemNotFoundException }
 import java.net.URI
 
 import sbt._
@@ -26,12 +26,19 @@ object ThriftTransformerSBT extends AutoPlugin {
   }
   import autoImport._
 
+  // wrapper around the exception throwing default method
+  def getFileSystem(uri: URI): Option[FileSystem] = try {
+      Option(FileSystems.getFileSystem(uri))
+    } catch {
+      case _: FileSystemNotFoundException => None
+    }
+
+  def getOrCreateFileSystem(uri: URI): FileSystem =
+    getFileSystem(uri).getOrElse(FileSystems.newFileSystem(uri, new java.util.HashMap[String, Any]()))
+
   def buildClasspathImporter(jars: Seq[File]): Importer = jars.map { fname =>
-      val fs = FileSystems.newFileSystem(URI.create(s"jar:file://$fname"), new java.util.HashMap[String, Any]())
-      println(s"[PMR 1703] importer: ${fname}")
-      val i = new ZipImporter(fname)
-      fs.close()
-      i
+      val fs = getOrCreateFileSystem(URI.create(s"jar:file://$fname"))
+      ImporterWithBasePath(new ZipImporter(fname), fs)
     }.foldLeft(NullImporter: Importer)((acc, i) => i +: acc)
 
   // sourceGenerators gets reset when Jvm Plugin starts, so we want to start
