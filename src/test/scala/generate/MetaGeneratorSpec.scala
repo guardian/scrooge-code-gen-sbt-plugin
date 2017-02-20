@@ -39,14 +39,12 @@ class MetaGeneratorSpec extends FunSpec with Matchers with Inside with OptionVal
       }
     }
     it("should correctly identify fields") {
-      inside(generator.generateCaseClass(simpleStruct).get(Identifier("SimpleStruct"))) {
-        case Some(generatedCaseClass) => inside(generatedCaseClass) {
-          case GeneratedCaseClass(Identifier("SimpleStruct"), fields) =>
-            fields should contain inOrderOnly (
-              GeneratedField(Identifier("name"), ScalaType.String, 1),
-              GeneratedField(Identifier("age"), ScalaType.Int, 2)
-            )
-        }
+      inside(generator.generateCaseClass(simpleStruct)) {
+        case GeneratedCaseClass(Identifier("SimpleStruct"), fields) =>
+          fields should contain inOrderOnly (
+            GeneratedField(Identifier("name"), ScalaType.String, 1),
+            GeneratedField(Identifier("age"), ScalaType.Int, 2)
+          )
       }
     }
     it("it should generate package with multiple structs") {

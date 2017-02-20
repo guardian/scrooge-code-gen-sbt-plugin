@@ -59,8 +59,6 @@ case class GeneratedPackage(name: Identifier, definitions: Seq[GeneratedDefiniti
 
 class CaseClassGenerator(val packageName: Identifier) {
 
-  type Definitions = Map[Identifier, GeneratedDefinition]
-
   def genType(t: FunctionType): ScalaType = t match {
       case TBool => ScalaType.Boolean
       case TByte => ScalaType.Byte
@@ -78,23 +76,16 @@ class CaseClassGenerator(val packageName: Identifier) {
       scalaType = genType(field.fieldType),
       fieldId = field.index)
 
-  def generateMembers(st: StructLike): (Definitions, SortedSet[GeneratedField]) =
-    (Map.empty, SortedSet(st.fields.map(generateField):_*))
+  def generateMembers(st: StructLike): SortedSet[GeneratedField] =
+    SortedSet(st.fields.map(generateField):_*)
 
   /* a struct may have other structs within it, which means that we
    * may in fact need to generate more than one case class from this
    * definition. Therefore, we return a map of case classes, keyed off
    * the name, and these can then be merged together */
-  def generateCaseClass(st: StructLike): Definitions = {
-    val name = Identifier(st.sid.name)
-    val (definitions, members) = generateMembers(st)
-    definitions + (name -> GeneratedCaseClass(name, members))
-  }
+  def generateCaseClass(st: StructLike): GeneratedCaseClass =
+    GeneratedCaseClass(Identifier(st.sid.name), generateMembers(st))
 
-  def generatePackage(doc:Document): GeneratedPackage = {
-    val caseClasses = doc.structs.foldLeft(Map.empty: Definitions) {
-        (acc, struct) => acc ++ generateCaseClass(struct)
-      }
-    GeneratedPackage(packageName, caseClasses.values.toSeq)
-  }
+  def generatePackage(doc:Document): GeneratedPackage =
+    GeneratedPackage(packageName, doc.structs.map(generateCaseClass _))
 }
