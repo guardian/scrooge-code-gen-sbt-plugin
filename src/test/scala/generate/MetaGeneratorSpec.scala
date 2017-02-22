@@ -4,15 +4,17 @@ import com.gu.thrifttransformer.sbt._
 import scala.collection.immutable.SortedSet
 import org.scalatest.{ FunSpec, Matchers, Inside, OptionValues }
 
-import com.twitter.scrooge.frontend.{ ThriftParser, TypeResolver }
+import com.twitter.scrooge.frontend.{ ThriftParser, TypeResolver, DirImporter }
 import com.twitter.scrooge.{ ast => scroogeAst }
 
 class MetaGeneratorSpec extends FunSpec with Matchers with Inside with OptionValues {
 
   lazy val resolvedDocument =  {
-    val parser = new ThriftParser(new ResourceImporter(), false)
+    val parser = new ThriftParser(new DirImporter(
+        new java.io.File(this.getClass.getResource("/example-thrift").getFile)), false
+      )
     val resolver = new TypeResolver()
-    resolver(parser.parseFile("/example-thrift/simple.thrift"))
+    resolver(parser.parseFile("simple.thrift"))
   }
 
   lazy val document = resolvedDocument.document
@@ -60,7 +62,7 @@ class MetaGeneratorSpec extends FunSpec with Matchers with Inside with OptionVal
     it("it should generate package with multiple structs") {
       inside(generator.generatePackage(document)) {
         case GeneratedPackage(Identifier("SimpleTest"), caseClasses) =>
-          caseClasses should have size 3
+          caseClasses should have size 4
       }
     }
     it("it should handle nested structs") {
@@ -74,6 +76,12 @@ class MetaGeneratorSpec extends FunSpec with Matchers with Inside with OptionVal
                   ScalaType.CustomType(Identifier("SimpleStruct")), 2) =>
               }
           }
+      }
+    }
+    it("should include data from included files") {
+      inside(generator.generatePackage(document)) {
+        case GeneratedPackage(_, caseClasses) =>
+          caseClasses.find(_.name == Identifier("IncludedStruct")) shouldBe defined
       }
     }
   }

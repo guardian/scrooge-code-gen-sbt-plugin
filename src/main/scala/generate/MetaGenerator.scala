@@ -10,6 +10,10 @@ case class Identifier(generate: String) {
   assert(generate.matches("^[A-Za-z_]+"))
 }
 
+object Identifier {
+  implicit def makeId(s:String) = Identifier(s)
+}
+
 sealed trait GeneratedCode {
   def generate: String
 }
@@ -92,6 +96,16 @@ class CaseClassGenerator(val packageName: Identifier) {
   def generateCaseClass(st: StructLike): GeneratedCaseClass =
     GeneratedCaseClass(Identifier(st.sid.name), generateMembers(st))
 
+  def generateDefinitions(doc: scroogeAst.Document): Seq[GeneratedDefinition] = {
+    val local = doc.defs collect {
+      case st: StructLike => generateCaseClass(st)
+      }
+    val included = (doc.headers collect {
+        case Include(_, doc) => generateDefinitions(doc)
+      }).flatten
+    local ++ included
+  }
+
   def generatePackage(doc:Document): GeneratedPackage =
-    GeneratedPackage(packageName, doc.structs.map(generateCaseClass _))
+    GeneratedPackage(packageName, generateDefinitions(doc))
 }
