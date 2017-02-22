@@ -7,8 +7,9 @@ import com.twitter.scrooge.{ast => scroogeAst}
 
 import scala.collection.immutable.{Seq => ImmutableSeq}
 
-case class Identifier(generate: String) {
-  assert(generate.matches("^[A-Za-z_]+"))
+case class Identifier(name: String) {
+  assert(name.matches("^[A-Za-z_]+"))
+  val generate: String = s"""`$name`""" // quote, just in case its a reserved word
 }
 
 sealed trait GeneratedCode {
@@ -17,6 +18,7 @@ sealed trait GeneratedCode {
 
 sealed trait GeneratedDefinition extends GeneratedCode {
   def name: Identifier
+  //override def equals(that: Any
 }
 
 trait MetaGenerator {
@@ -57,9 +59,9 @@ case class GeneratedCaseClass(name: Identifier, fields: SortedSet[GeneratedField
   val generate = s"case class ${name.generate}($fieldsString)"
 }
 
-case class GeneratedPackage(name: Identifier, definitions: Seq[GeneratedDefinition]) extends GeneratedCode {
+case class GeneratedPackage(name: Identifier, definitions: Set[GeneratedDefinition]) extends GeneratedCode {
   val definitionsString = definitions.map(_.generate).mkString("\n")
-  val generate = s"package ${name.generate} { $definitionsString }"
+  val generate = s"package ${name.generate}\n$definitionsString"
 }
 
 class CaseClassGenerator(val packageName: Identifier) {
@@ -93,16 +95,15 @@ class CaseClassGenerator(val packageName: Identifier) {
   def generateCaseClass(st: StructLike): GeneratedCaseClass =
     GeneratedCaseClass(Identifier(st.sid.name), generateMembers(st))
 
-  def generateDefinitions(doc: ResolvedDocument, recurse: Boolean): Seq[GeneratedDefinition] = {
+  def generateDefinitions(doc: ResolvedDocument, recurse: Boolean): Set[GeneratedDefinition] = {
     val local = doc.document.defs collect {
-      case st: StructLike => generateCaseClass(st)
+        case st: StructLike => generateCaseClass(st)
       }
-    // act resursively if provided with a resolver
-    local ++ (if(recurse) {
-        (doc.document.headers collect {
-          case Include(_, includedDoc) => generateDefinitions(doc.resolver(includedDoc), recurse)
-        }).flatten
-      } else Nil)
+    (local ++ (if(recurse) {
+      (doc.document.headers collect {
+        case Include(_, includedDoc) => generateDefinitions(doc.resolver(includedDoc), recurse)
+      }).flatten
+    } else Nil)).toSet
   }
 
   def generatePackage(doc: ResolvedDocument, recurse: Boolean = false) =

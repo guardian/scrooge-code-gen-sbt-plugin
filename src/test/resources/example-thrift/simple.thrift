@@ -1,4 +1,5 @@
 include "included.thrift"
+include "alsoincluded.thrift"
 
 struct SimpleStruct {
   1: string name

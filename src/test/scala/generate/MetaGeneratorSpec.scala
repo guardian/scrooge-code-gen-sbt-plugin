@@ -84,5 +84,11 @@ class MetaGeneratorSpec extends FunSpec with Matchers with Inside with OptionVal
           caseClasses.find(_.name == Identifier("IncludedStruct")) shouldBe defined
       }
     }
+    it("should only generate a definition once") {
+      val names = generator.generatePackage(resolvedDocument, recurse = true)
+        .definitions
+        .map(_.name)
+      names should contain theSameElementsAs names.toSet
+    }
   }
 }
