@@ -60,13 +60,13 @@ class MetaGeneratorSpec extends FunSpec with Matchers with Inside with OptionVal
       }
     }
     it("it should generate package with multiple structs") {
-      inside(generator.generatePackage(document)) {
+      inside(generator.generatePackage(resolvedDocument)) {
         case GeneratedPackage(Identifier("SimpleTest"), caseClasses) =>
-          caseClasses should have size 4
+          caseClasses should have size 3
       }
     }
     it("it should handle nested structs") {
-      inside(generator.generatePackage(document)) {
+      inside(generator.generatePackage(resolvedDocument)) {
         case GeneratedPackage(Identifier("SimpleTest"), caseClasses) =>
           val nested = caseClasses.find(_.name == Identifier("HasNested")).value
           inside(nested) {
@@ -79,7 +79,7 @@ class MetaGeneratorSpec extends FunSpec with Matchers with Inside with OptionVal
       }
     }
     it("should include data from included files") {
-      inside(generator.generatePackage(document)) {
+      inside(generator.generatePackage(resolvedDocument, recurse = true)) {
         case GeneratedPackage(_, caseClasses) =>
           caseClasses.find(_.name == Identifier("IncludedStruct")) shouldBe defined
       }

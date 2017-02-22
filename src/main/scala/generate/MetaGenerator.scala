@@ -1,5 +1,6 @@
 package com.gu.thrifttransformer.generate
 
+import com.twitter.scrooge.frontend.ResolvedDocument
 import scala.collection.immutable.SortedSet
 import com.twitter.scrooge.ast._
 import com.twitter.scrooge.{ast => scroogeAst}
@@ -8,10 +9,6 @@ import scala.collection.immutable.{Seq => ImmutableSeq}
 
 case class Identifier(generate: String) {
   assert(generate.matches("^[A-Za-z_]+"))
-}
-
-object Identifier {
-  implicit def makeId(s:String) = Identifier(s)
 }
 
 sealed trait GeneratedCode {
@@ -96,16 +93,18 @@ class CaseClassGenerator(val packageName: Identifier) {
   def generateCaseClass(st: StructLike): GeneratedCaseClass =
     GeneratedCaseClass(Identifier(st.sid.name), generateMembers(st))
 
-  def generateDefinitions(doc: scroogeAst.Document): Seq[GeneratedDefinition] = {
-    val local = doc.defs collect {
+  def generateDefinitions(doc: ResolvedDocument, recurse: Boolean): Seq[GeneratedDefinition] = {
+    val local = doc.document.defs collect {
       case st: StructLike => generateCaseClass(st)
       }
-    val included = (doc.headers collect {
-        case Include(_, doc) => generateDefinitions(doc)
-      }).flatten
-    local ++ included
+    // act resursively if provided with a resolver
+    local ++ (if(recurse) {
+        (doc.document.headers collect {
+          case Include(_, includedDoc) => generateDefinitions(doc.resolver(includedDoc), recurse)
+        }).flatten
+      } else Nil)
   }
 
-  def generatePackage(doc:Document): GeneratedPackage =
-    GeneratedPackage(packageName, generateDefinitions(doc))
+  def generatePackage(doc: ResolvedDocument, recurse: Boolean = false) =
+    GeneratedPackage(packageName, generateDefinitions(doc, recurse))
 }

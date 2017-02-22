@@ -64,7 +64,7 @@ object ThriftTransformerSBT extends AutoPlugin {
       val docs = thriftTransformThriftFiles.value.map { f =>
         resolver(parser.parseFile(f.getPath))
       }
-      val srcFiles = docs.map(resolvedDoc => generator.generatePackage(resolvedDoc.document))
+      val srcFiles = docs.map(resolvedDoc => generator.generatePackage(resolvedDoc, recurse = true))
       // write each document out to a file, returning the filename (as File())
       srcFiles map { srcFile =>
         val fname = thriftTransformSourceDir.value / (thriftTransformPackageName.value + ".scala")
