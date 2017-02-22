@@ -1,7 +1,7 @@
 package com.gu.thrifttransformer.generate
 
 import scala.collection.immutable.SortedSet
-import com.twitter.scrooge.ast.{ListType, NamedType, ReferenceType, _}
+import com.twitter.scrooge.ast._
 import com.twitter.scrooge.{ast => scroogeAst}
 
 import scala.collection.immutable.{Seq => ImmutableSeq}
@@ -35,7 +35,11 @@ object ScalaType {
   case object Double  extends ScalaType("Double")
   case object Byte    extends ScalaType("Byte")
 
-  case class  CaseClass(name: Identifier) extends ScalaType(name.generate)
+  case class List(fieldType: ScalaType) extends ScalaType(s"Seq[${fieldType}]")
+
+  // this describes a field who's type is a custom type (e.g. a
+  // struct) that is defined elsewhere in the document
+  case class CustomType(name: Identifier) extends ScalaType(name.generate)
 }
 
 case class GeneratedField(name: Identifier, scalaType: ScalaType, fieldId: Int) extends GeneratedCode {
@@ -67,7 +71,9 @@ class CaseClassGenerator(val packageName: Identifier) {
       case TI64 => ScalaType.Long
       case TDouble => ScalaType.Double
       case TString => ScalaType.String
-      case StructType(st, _) => ScalaType.CaseClass(Identifier(st.sid.name))
+      case ListType(elementType, _) => ScalaType.List(genType(elementType))
+      case StructType(st, _) => ScalaType.CustomType(Identifier(st.sid.name))
+      case EnumType(enum, _) => ScalaType.CustomType(Identifier(enum.sid.name))
       case _ => throw new IllegalArgumentException(s"Unrecognised type $t")
     }
 
