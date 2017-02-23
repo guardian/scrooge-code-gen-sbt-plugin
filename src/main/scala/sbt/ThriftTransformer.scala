@@ -67,7 +67,7 @@ object ThriftTransformerSBT extends AutoPlugin {
       val srcFiles = docs.flatMap(resolvedDoc => generator.generatePackage(resolvedDoc, recurse = true))
       // write each document out to a file, returning the filename (as File())
       srcFiles.zipWithIndex map { case (srcFile, index) =>
-        val fname = thriftTransformSourceDir.value / s"${thriftTransformPackageName.value}_$index.scala"
+        val fname = thriftTransformSourceDir.value / s"${thriftTransformPackageName.value}$index.scala"
         fname.getParentFile.mkdirs()
         val out = new PrintStream(fname)
         out.print(srcFile.generate)
