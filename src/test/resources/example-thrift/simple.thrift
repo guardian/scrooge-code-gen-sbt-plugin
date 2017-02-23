@@ -1,3 +1,6 @@
+namespace   java  simple.test
+#@namespace scala simple.test
+
 include "included.thrift"
 include "alsoincluded.thrift"
 

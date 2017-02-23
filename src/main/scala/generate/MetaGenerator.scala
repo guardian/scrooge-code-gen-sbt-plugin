@@ -8,7 +8,7 @@ import com.twitter.scrooge.{ast => scroogeAst}
 import scala.collection.immutable.{Seq => ImmutableSeq}
 
 case class Identifier(name: String) {
-  assert(name.matches("^[A-Za-z_]+"))
+  require(name.matches("^[A-Za-z_.]+"))
   val generate: String = s"""`$name`""" // quote, just in case its a reserved word
 }
 
@@ -59,9 +59,12 @@ case class GeneratedCaseClass(name: Identifier, fields: SortedSet[GeneratedField
   val generate = s"case class ${name.generate}($fieldsString)"
 }
 
-case class GeneratedPackage(name: Identifier, definitions: Set[GeneratedDefinition]) extends GeneratedCode {
+case class GeneratedPackage(definitions: Set[GeneratedDefinition], name: Option[Identifier] = None) extends GeneratedCode {
   val definitionsString = definitions.map(_.generate).mkString("\n")
-  val generate = s"package ${name.generate}\n$definitionsString"
+  val generate = {
+    val packageDecl = name.map(n => s"package ${n.generate}\n").getOrElse("")
+    s"$packageDecl$definitionsString"
+  }
 }
 
 class CaseClassGenerator(val packageName: Identifier) {
@@ -106,6 +109,14 @@ class CaseClassGenerator(val packageName: Identifier) {
     } else Nil)).toSet
   }
 
-  def generatePackage(doc: ResolvedDocument, recurse: Boolean = false) =
-    GeneratedPackage(packageName, generateDefinitions(doc, recurse))
+  def generatePackage(rdoc: ResolvedDocument, recurse: Boolean = false): Seq[GeneratedPackage] = {
+    def findNameSpace(kind: String): PartialFunction[Header, scroogeAst.Identifier] = {
+      case Namespace(`kind`, id) => id
+    }
+    // look for name spaces in the document
+    val packageName = rdoc.document.headers.collectFirst(
+        findNameSpace("scala") orElse findNameSpace("java")
+      ).map(id => Identifier(id.fullName))
+    Seq(GeneratedPackage(generateDefinitions(rdoc, recurse), packageName))
+  }
 }
