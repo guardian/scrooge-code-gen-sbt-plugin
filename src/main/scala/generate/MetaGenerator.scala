@@ -117,6 +117,12 @@ class CaseClassGenerator(val packageName: Identifier) {
     val packageName = rdoc.document.headers.collectFirst(
         findNameSpace("scala") orElse findNameSpace("java")
       ).map(id => Identifier(id.fullName))
-    Seq(GeneratedPackage(generateDefinitions(rdoc, recurse), packageName))
+    val includedDocs = if(recurse) {
+        rdoc.document.headers.collect {
+          case Include(_, includedDoc) => rdoc.resolver(includedDoc)
+        }
+      } else Nil
+    GeneratedPackage(generateDefinitions(rdoc, recurse), packageName) +:
+      includedDocs.flatMap(d => generatePackage(d, recurse))
   }
 }
