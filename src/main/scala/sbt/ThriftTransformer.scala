@@ -62,11 +62,22 @@ object ThriftTransformerSBT extends AutoPlugin {
       val resolver = new TypeResolver()
       val generator = new CaseClassGenerator(Identifier(thriftTransformPackageName.value))
       val docs = thriftTransformThriftFiles.value.map { f =>
-        resolver(parser.parseFile(f.getPath))
+        (f, resolver(parser.parseFile(f.getPath)))
       }
-      val srcFiles = docs.flatMap(resolvedDoc => generator.generatePackage(resolvedDoc, recurse = true))
+      val packages = docs.flatMap { case (fname, resolvedDoc) =>
+          println(s"[PMR 1652] SBT => ${fname}")
+          generator.generatePackage(resolvedDoc, recurse = true, fname = Some(fname))
+        }
+      packages foreach { p =>
+        println(p.name.map(_.generate).getOrElse("_root_"))
+        p.definitions foreach { defn =>
+          if(defn.name == Identifier("Asset")) {
+            println(s"   `- ${defn.name.generate} from ${defn.definedIn}")
+          }
+        }
+      }
       // write each document out to a file, returning the filename (as File())
-      srcFiles.zipWithIndex map { case (srcFile, index) =>
+      packages.zipWithIndex map { case (srcFile, index) =>
         val fname = thriftTransformSourceDir.value / s"${thriftTransformPackageName.value}$index.scala"
         fname.getParentFile.mkdirs()
         val out = new PrintStream(fname)

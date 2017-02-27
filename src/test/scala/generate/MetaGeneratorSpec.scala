@@ -64,13 +64,13 @@ class MetaGeneratorSpec extends FunSpec
       }
     }
     it("it should generate package with multiple structs") {
-      inside(generator.generatePackage(resolvedDocument)) {
+      inside(generator.generatePackage(resolvedDocument, None)) {
         case Seq(GeneratedPackage(caseClasses, _)) =>
           caseClasses should have size 3
       }
     }
     it("it should handle nested structs") {
-      inside(generator.generatePackage(resolvedDocument).headOption) {
+      inside(generator.generatePackage(resolvedDocument, None).headOption) {
         case Some(GeneratedPackage(caseClasses,_)) =>
           val nested = caseClasses.find(_.name == Identifier("HasNested")).value
           inside(nested) {
@@ -83,7 +83,7 @@ class MetaGeneratorSpec extends FunSpec
       }
     }
     it("should correctly handle enum definitions") {
-      inside(generator.generatePackage(parseFile("hasEnum.thrift")).headOption) {
+      inside(generator.generatePackage(parseFile("hasEnum.thrift"), None).headOption) {
         case Some(GeneratedPackage(defns, _)) =>
           defns should have size 1
           inside(defns.headOption) {
@@ -96,22 +96,22 @@ class MetaGeneratorSpec extends FunSpec
       }
     }
     it("should include data from included files") {
-      inside(generator.generatePackage(resolvedDocument, recurse = true).headOption) {
+      inside(generator.generatePackage(resolvedDocument, None, recurse = true).headOption) {
         case Some(GeneratedPackage(caseClasses, _)) =>
           caseClasses.find(_.name == Identifier("IncludedStruct")) shouldBe defined
       }
     }
     it("should only generate a definition once") {
-      forAll(generator.generatePackage(resolvedDocument, recurse = true)) { pkg =>
+      forAll(generator.generatePackage(resolvedDocument, None, recurse = true)) { pkg =>
         val names = pkg.definitions.map(_.name)
         names should contain theSameElementsAs names.toSet
       }
     }
     it("should honour the namespaces") {
       println(
-        generator.generatePackage(resolvedDocument, recurse = true).map(_.generate).mkString("\n")
+        generator.generatePackage(resolvedDocument, None, recurse = true).map(_.generate).mkString("\n")
       )
-      generator.generatePackage(resolvedDocument, recurse = true).map(_.name) should contain only (
+      generator.generatePackage(resolvedDocument, None, recurse = true).map(_.name) should contain only (
         Some(Identifier("simple.test")),
         Some(Identifier("simple.test.included")),
         None
