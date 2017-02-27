@@ -8,8 +8,13 @@ import com.twitter.scrooge.{ast => scroogeAst}
 import scala.collection.immutable.{Seq => ImmutableSeq}
 
 case class Identifier(name: String) {
+  val shouldBeQuoted = Identifier.keywords.contains(name)
   require(name.matches("^[A-Za-z_.]+"))
-  val generate: String = s"""`$name`""" // quote, just in case its a reserved word
+  val generate: String = if(shouldBeQuoted) s"""`$name`""" else name // possibly quote, just in case its a reserved word
+}
+
+object Identifier {
+  val keywords = Seq("type")
 }
 
 sealed trait GeneratedCode {
@@ -18,7 +23,6 @@ sealed trait GeneratedCode {
 
 sealed trait GeneratedDefinition extends GeneratedCode {
   def name: Identifier
-  //override def equals(that: Any
 }
 
 trait MetaGenerator {
@@ -61,6 +65,13 @@ case class GeneratedCaseClass(name: Identifier, fields: SortedSet[GeneratedField
 
 case class GeneratedPackage(definitions: Set[GeneratedDefinition], name: Option[Identifier] = None) extends GeneratedCode {
   val definitionsString = definitions.map(_.generate).mkString("\n")
+  // add definitions to this package
+  def `+`(newDefinition: GeneratedDefinition): GeneratedPackage =
+      this.copy(definitions = definitions + newDefinition)
+  def `++`(newDefinitions: Seq[GeneratedDefinition]): GeneratedPackage =
+      this.copy(definitions = definitions ++ newDefinitions)
+  def `++`(otherPkg: GeneratedPackage): GeneratedPackage =
+      this.copy(definitions = definitions ++ otherPkg.definitions)
   val generate = {
     val packageDecl = name.map(n => s"package ${n.generate}\n").getOrElse("")
     s"$packageDecl$definitionsString"
@@ -110,19 +121,28 @@ class CaseClassGenerator(val packageName: Identifier) {
   }
 
   def generatePackage(rdoc: ResolvedDocument, recurse: Boolean = false): Seq[GeneratedPackage] = {
-    def findNameSpace(kind: String): PartialFunction[Header, scroogeAst.Identifier] = {
-      case Namespace(`kind`, id) => id
-    }
-    // look for name spaces in the document
-    val packageName = rdoc.document.headers.collectFirst(
-        findNameSpace("scala") orElse findNameSpace("java")
-      ).map(id => Identifier(id.fullName))
+    val packageName = (rdoc.document.namespace("scala") orElse rdoc.document.namespace("java"))
+      .map(id => Identifier(id.fullName))
     val includedDocs = if(recurse) {
         rdoc.document.headers.collect {
-          case Include(_, includedDoc) => rdoc.resolver(includedDoc)
+          case Include(fname, includedDoc) => (fname, rdoc.resolver(includedDoc))
         }
       } else Nil
-    GeneratedPackage(generateDefinitions(rdoc, recurse), packageName) +:
-      includedDocs.flatMap(d => generatePackage(d, recurse))
+    val packages = GeneratedPackage(generateDefinitions(rdoc, recurse), packageName) +:
+      includedDocs.flatMap { d =>
+        val (fname, rdoc) = d
+        val incpkgs = generatePackage(rdoc, recurse)
+        val pkgnames = incpkgs.map(_.name.map(_.generate).getOrElse("<noname>")).mkString(",")
+        println(s"[PMR 1424] For document $fname $pkgnames")
+        incpkgs
+      }
+    // merge the packages so that each one appears only once (and
+    // thereby removing duplicate entries, which would otherwise
+    // render the file uncompilable)
+    packages.foldLeft(Map.empty: Map[Identifier, GeneratedPackage]) { (acc, pkg) =>
+      val key = pkg.name.getOrElse(Identifier("_root_"))
+      val updatedValue = acc.get(key).map(_ ++ pkg).getOrElse(pkg)
+      acc.updated(key, updatedValue)
+    }.values.toSeq
   }
 }

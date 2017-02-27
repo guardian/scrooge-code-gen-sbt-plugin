@@ -2,12 +2,16 @@ package com.gu.thrifttransformer.generate
 
 import com.gu.thrifttransformer.sbt._
 import scala.collection.immutable.SortedSet
-import org.scalatest.{ FunSpec, Matchers, Inside, OptionValues }
+import org.scalatest.{ FunSpec, Matchers, Inside, OptionValues, Inspectors }
 
 import com.twitter.scrooge.frontend.{ ThriftParser, TypeResolver, DirImporter }
 import com.twitter.scrooge.{ ast => scroogeAst }
 
-class MetaGeneratorSpec extends FunSpec with Matchers with Inside with OptionValues {
+class MetaGeneratorSpec extends FunSpec
+    with Matchers
+    with Inside
+    with OptionValues
+    with Inspectors {
 
   lazy val resolvedDocument =  {
     val parser = new ThriftParser(new DirImporter(
@@ -85,11 +89,10 @@ class MetaGeneratorSpec extends FunSpec with Matchers with Inside with OptionVal
       }
     }
     it("should only generate a definition once") {
-      val names = generator.generatePackage(resolvedDocument, recurse = true)
-        .head
-        .definitions
-        .map(_.name)
-      names should contain theSameElementsAs names.toSet
+      forAll(generator.generatePackage(resolvedDocument, recurse = true)) { pkg =>
+        val names = pkg.definitions.map(_.name)
+        names should contain theSameElementsAs names.toSet
+      }
     }
     it("should honour the namespaces") {
       println(
