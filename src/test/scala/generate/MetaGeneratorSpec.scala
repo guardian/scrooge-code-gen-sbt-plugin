@@ -13,13 +13,13 @@ class MetaGeneratorSpec extends FunSpec
     with OptionValues
     with Inspectors {
 
-  lazy val resolvedDocument =  {
-    val parser = new ThriftParser(new DirImporter(
-        new java.io.File(this.getClass.getResource("/example-thrift").getFile)), false
-      )
-    val resolver = new TypeResolver()
-    resolver(parser.parseFile("simple.thrift"))
-  }
+  val parser = new ThriftParser(new DirImporter(
+      new java.io.File(this.getClass.getResource("/example-thrift").getFile)), false
+    )
+
+  def parseFile(fileName: String) = new TypeResolver()(parser.parseFile(fileName))
+
+  lazy val resolvedDocument = parseFile("simple.thrift") // default resolved document
 
   lazy val document = resolvedDocument.document
 
@@ -55,7 +55,7 @@ class MetaGeneratorSpec extends FunSpec
     }
     it("should correctly identify fields") {
       inside(generator.generateCaseClass(simpleStruct)) {
-        case GeneratedCaseClass(Identifier("SimpleStruct"), fields) =>
+        case GeneratedCaseClass(Identifier("SimpleStruct"), fields, _) =>
           fields should contain inOrderOnly (
             GeneratedField(Identifier("name"), ScalaType.String, 1),
             GeneratedField(Identifier("age"), ScalaType.Int, 2),
@@ -74,11 +74,24 @@ class MetaGeneratorSpec extends FunSpec
         case Some(GeneratedPackage(caseClasses,_)) =>
           val nested = caseClasses.find(_.name == Identifier("HasNested")).value
           inside(nested) {
-            case GeneratedCaseClass(Identifier("HasNested"), fields) =>
+            case GeneratedCaseClass(Identifier("HasNested"), fields, _) =>
               fields.find(_.name == Identifier("nested")).value should matchPattern {
                 case GeneratedField(Identifier("nested"),
                   ScalaType.CustomType(Identifier("SimpleStruct")), 2) =>
               }
+          }
+      }
+    }
+    it("should correctly handle enum definitions") {
+      inside(generator.generatePackage(parseFile("hasEnum.thrift")).headOption) {
+        case Some(GeneratedPackage(defns, _)) =>
+          defns should have size 1
+          inside(defns.headOption) {
+            case Some(GeneratedEnumeration(Identifier("TestEnum"), fields, _)) =>
+              fields should contain only (
+                GeneratedEnumField(Identifier("good"), 1),
+                GeneratedEnumField(Identifier("bad"),  2)
+              )
           }
       }
     }
