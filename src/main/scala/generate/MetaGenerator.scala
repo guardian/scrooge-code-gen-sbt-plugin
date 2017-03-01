@@ -28,7 +28,7 @@ sealed trait GeneratedCode {
 }
 
 sealed trait GeneratedDefinition extends GeneratedCode {
-  def definedIn: Option[File]
+  def definedIn: File
   def name: Identifier
 }
 
@@ -65,8 +65,11 @@ object GeneratedField {
   implicit val ordering = Ordering.by[GeneratedField, Int](_.fieldId)
 }
 
-case class GeneratedCaseClass(name: Identifier, fields: SortedSet[GeneratedField], definedIn: Option[File] = None)
-    extends GeneratedDefinition {
+case class GeneratedCaseClass(
+  name: Identifier,
+  fields: SortedSet[GeneratedField],
+  definedIn: File
+) extends GeneratedDefinition {
   val fieldsString = fields.map(_.generate).mkString(",")
   val generate = s"case class ${name.generate}($fieldsString)"
 }
@@ -80,7 +83,11 @@ case class GeneratedEnumField(name: Identifier, constant: Int) {
 object GeneratedEnumField {
   implicit val ordering = Ordering.by[GeneratedEnumField, Int](_.constant)
 }
-case class GeneratedEnumeration(name: Identifier, fields: SortedSet[GeneratedEnumField], definedIn: Option[File] = None) extends GeneratedDefinition {
+case class GeneratedEnumeration(
+  name: Identifier,
+  fields: SortedSet[GeneratedEnumField],
+  definedIn: File
+) extends GeneratedDefinition {
   lazy val fieldStr = fields.toSeq.map(f => f.generate)
   lazy val generate = s"""object ${name.generate} extends scala.Enumeration { ${fieldStr.mkString("; ")} }"""
 }
@@ -126,26 +133,28 @@ class CaseClassGenerator(val packageName: Identifier) {
    * may in fact need to generate more than one case class from this
    * definition. Therefore, we return a map of case classes, keyed off
    * the name, and these can then be merged together */
-  def generateCaseClass(st: scroogeAst.StructLike, fname: Option[File] = None): GeneratedCaseClass =
+  def generateCaseClass(st: scroogeAst.StructLike, fname: File): GeneratedCaseClass =
     GeneratedCaseClass(Identifier(st.sid.name), generateMembers(st), fname)
 
-  def generateDefinition(fname: Option[File] = None): PartialFunction[scroogeAst.Definition, GeneratedDefinition] = {
+  def generateDefinition(fname: File): PartialFunction[scroogeAst.Definition, GeneratedDefinition] = {
     case st: scroogeAst.StructLike => generateCaseClass(st, fname)
     case scroogeAst.Enum(name, values, _, _) =>
       GeneratedEnumeration(Identifier(name.fullName),
-        SortedSet(values.map(f => GeneratedEnumField(Identifier(f.sid.fullName), f.value)): _*))
+        SortedSet(values .map(f =>
+          GeneratedEnumField(Identifier(f.sid.fullName), f.value)
+        ): _*), fname)
   }
 
-  def generateDefinitions(doc: ResolvedDocument, recurse: Boolean, fname: Option[File] = None): Set[GeneratedDefinition] = {
+  def generateDefinitions(doc: ResolvedDocument, recurse: Boolean, fname: File): Set[GeneratedDefinition] = {
     val local = doc.document.defs.collect(generateDefinition(fname))
     (local ++ (if(recurse) {
       (doc.document.headers collect {
-        case scroogeAst.Include(_, includedDoc) => generateDefinitions(doc.resolver(includedDoc), recurse)
+        case scroogeAst.Include(_, includedDoc) => generateDefinitions(doc.resolver(includedDoc), recurse, fname)
       }).flatten
     } else Nil)).toSet
   }
 
-  def generatePackage(rdoc: ResolvedDocument, fname: Option[File], recurse: Boolean = false): Seq[GeneratedPackage] = {
+  def generatePackage(rdoc: ResolvedDocument, fname: File, recurse: Boolean = false): Seq[GeneratedPackage] = {
     val packageName = (rdoc.document.namespace("scala") orElse rdoc.document.namespace("java"))
       .map(id => Identifier(id.fullName))
     val includedDocs = if(recurse) {
@@ -157,7 +166,7 @@ class CaseClassGenerator(val packageName: Identifier) {
       includedDocs.flatMap { d =>
         val (includedFname, rdoc) = d
         println(s"[PMR 1658] processing included file $fname => $includedFname :: ${Some(new File(includedFname))}")
-        generatePackage(rdoc, Some(new File(includedFname)), recurse)
+        generatePackage(rdoc, new File(includedFname), recurse)
       }
     // merge the packages so that each one appears only once (and
     // thereby removing duplicate entries, which would otherwise
