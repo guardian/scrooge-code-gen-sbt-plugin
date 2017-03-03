@@ -53,7 +53,7 @@ class MetaGeneratorSpec extends FunSpec
     it("should correctly choose field type") {
       generator.genType(nameField.fieldType) should be(ScalaType.String)
     }
-    it("it should handle List type's field type") {
+    it("should handle List type's field type") {
       generator.genType(stringsField.fieldType) should matchPattern {
         case ScalaType.List(ScalaType.String) =>
       }
@@ -73,13 +73,13 @@ class MetaGeneratorSpec extends FunSpec
           )
       }
     }
-    it("it should generate package with multiple structs") {
+    it("should generate package with multiple structs") {
       inside(generator.generatePackage(resolvedDocument, fileName)) {
         case Seq(GeneratedPackage(caseClasses, _)) =>
           caseClasses should have size 3
       }
     }
-    it("it should handle nested structs") {
+    it("should handle nested structs") {
       inside(generator.generatePackage(resolvedDocument, fileName).headOption) {
         case Some(GeneratedPackage(caseClasses, _)) =>
           val nested = caseClasses.find(_.name == Identifier("HasNested")).value

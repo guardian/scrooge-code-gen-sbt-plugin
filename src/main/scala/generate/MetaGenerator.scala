@@ -110,7 +110,10 @@ case class GeneratedPackage(
 }
 
 class CaseClassGenerator(val packageName: Identifier) {
-  def genType(t: scroogeAst.FunctionType): ScalaType = t match {
+
+  type IncludedTypesMap = Map[String, String]
+
+  def genType(t: scroogeAst.FunctionType, includedMap: IncludedTypesMap = Map.empty): ScalaType = t match {
       case scroogeAst.TBool => ScalaType.Boolean
       case scroogeAst.TByte => ScalaType.Byte
       case scroogeAst.TI16 => ScalaType.Short
@@ -119,29 +122,36 @@ class CaseClassGenerator(val packageName: Identifier) {
       case scroogeAst.TDouble => ScalaType.Double
       case scroogeAst.TString => ScalaType.String
       case scroogeAst.ListType(elementType, _) => ScalaType.List(genType(elementType))
-      case scroogeAst.StructType(st, _) => ScalaType.CustomType(Identifier(st.sid.name))
+      case scroogeAst.StructType(st, scoped) =>
+        val typeName = scoped.map { scope =>
+            // should fail if we do have a scope but it isn't the map,
+            // because that would mean we don't actually have a
+            // defintion of this struct
+            includedMap(scope.name) + "." + st.sid.name
+          } getOrElse st.sid.name
+        ScalaType.CustomType(Identifier(typeName))
       case scroogeAst.EnumType(enum, _) => ScalaType.CustomType(EnumValueIdentifier(Identifier(enum.sid.name)))
       case _ => throw new IllegalArgumentException(s"Unrecognised type $t")
     }
 
-  def generateField(field: scroogeAst.Field): GeneratedField =
+  def generateField(field: scroogeAst.Field, includeMap: IncludedTypesMap = Map.empty): GeneratedField =
     GeneratedField(name = Identifier(field.originalName),
-      scalaType = genType(field.fieldType),
+      scalaType = genType(field.fieldType, includeMap),
       fieldId = field.index)
 
-  def generateMembers(st: scroogeAst.StructLike): SortedSet[GeneratedField] =
-    SortedSet(st.fields.map(generateField):_*)
+  def generateMembers(st: scroogeAst.StructLike, includeMap: IncludedTypesMap): SortedSet[GeneratedField] =
+    SortedSet(st.fields.map(fld => generateField(fld, includeMap)):_*)
 
   /* a struct may have other structs within it, which means that we
    * may in fact need to generate more than one case class from this
    * definition. Therefore, we return a map of case classes, keyed off
    * the name, and these can then be merged together */
-  def generateCaseClass(st: scroogeAst.StructLike, fname: File, includedNamespaces: Map[String, String] = Map.empty) =
-    GeneratedCaseClass(Identifier(st.sid.name), generateMembers(st), fname)
+  def generateCaseClass(st: scroogeAst.StructLike, fname: File, includeMap: IncludedTypesMap = Map.empty) =
+    GeneratedCaseClass(Identifier(st.sid.name), generateMembers(st, includeMap), fname)
 
-  def generateDefinition(fname: File, includedNamespaces: Map[String, String] = Map.empty):
+  def generateDefinition(fname: File, includeMap: IncludedTypesMap):
       PartialFunction[scroogeAst.Definition, GeneratedDefinition] = {
-    case st: scroogeAst.StructLike => generateCaseClass(st, fname, includedNamespaces)
+    case st: scroogeAst.StructLike => generateCaseClass(st, fname, includeMap)
     case scroogeAst.Enum(name, values, _, _) =>
       GeneratedEnumeration(Identifier(name.fullName),
         SortedSet(values .map(f =>
@@ -149,39 +159,41 @@ class CaseClassGenerator(val packageName: Identifier) {
         ): _*), fname)
   }
 
-  def generateDefinitions(doc: ResolvedDocument, recurse: Boolean, fname: File): Set[GeneratedDefinition] =
-    doc.document.defs.collect(generateDefinition(fname)).toSet
+  def generateDefinitions(doc: ResolvedDocument, recurse: Boolean, fname: File,
+    includeMap: IncludedTypesMap): Set[GeneratedDefinition] =
+    doc.document.defs.collect(generateDefinition(fname, includeMap)).toSet
 
   def docPackageName(doc: scroogeAst.Document): Option[Identifier] =
     (doc.namespace("scala") orElse doc.namespace("java")).map(id => Identifier(id.fullName))
 
-  case class IncludedFileDetails(fname: String, doc: ResolvedDocument, namespace: Option[Identifier])
+  case class IncludedFileDetails(fname: String, doc: ResolvedDocument, namespace: Identifier)
 
   def generatePackage(rdoc: ResolvedDocument, fname: File, recurse: Boolean = false): Seq[GeneratedPackage] = {
-    val packageName = docPackageName(rdoc.document)
     val includedDocs =
-      if(recurse) {
         rdoc.document.headers.collect {
           case scroogeAst.Include(fname, includedDoc) =>
-            IncludedFileDetails(fname, rdoc.resolver(includedDoc), docPackageName(includedDoc))
+            println(s"[PMR 1752] $fname => ${docPackageName(includedDoc)}")
+            IncludedFileDetails(fname, rdoc.resolver(includedDoc), docPackageName(includedDoc).getOrElse(Identifier("_root_")))
         }
-      } else {
-        Nil
-      }
     // this contains a map of the included files to their
     // namespaces. This is used to qualify references to the included
     // type, which will appear as `scoped` identifiers in the Scrooge
     // AST (e.g. in thrift it looks like `shared.Atom`). We will look
     // up that scope in this map and affix the full package name to
     // the identifier in the generated scala code.
-    val namespaceMap = includedDocs.collect {
-        case IncludedFileDetails(fname, _, Some(namespace)) => fname -> namespace
+    val namespaceMap: IncludedTypesMap = includedDocs.collect {
+        case IncludedFileDetails(fname, _, namespace) =>
+          val key = (new File(fname).getName).replaceAll("\\.[^.]+$", "")
+          println(s"[PMR 1728] $key ${namespace.generate}")
+          key -> namespace.generate
       }.toMap
-    val packages = GeneratedPackage(generateDefinitions(rdoc, recurse, fname), packageName) +:
-      includedDocs.flatMap {
-        case IncludedFileDetails(includedFname, rdoc, _) =>
-          generatePackage(rdoc, new File(includedFname), recurse)
-      }
+    val packages = GeneratedPackage(generateDefinitions(rdoc, recurse, fname, namespaceMap), Some(packageName)) +:
+      (if(recurse) {
+        includedDocs.flatMap {
+          case IncludedFileDetails(includedFname, rdoc, _) =>
+            generatePackage(rdoc, new File(includedFname), recurse)
+        }
+      } else Nil)
     // merge the packages so that each one appears only once (and
     // thereby removing duplicate entries, which would otherwise
     // render the file uncompilable)
