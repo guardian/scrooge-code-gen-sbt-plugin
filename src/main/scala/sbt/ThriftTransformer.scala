@@ -66,7 +66,7 @@ object ThriftTransformerSBT extends AutoPlugin {
       }
       val packages = docs.flatMap { case (fname, resolvedDoc) =>
           println(s"[PMR 1652] SBT => ${fname}")
-          generator.generatePackage(resolvedDoc, recurse = true, fname = Some(fname))
+          generator.generatePackage(resolvedDoc, recurse = true, fname = fname)
         }
       packages foreach { p =>
         println(p.name.map(_.generate).getOrElse("_root_"))

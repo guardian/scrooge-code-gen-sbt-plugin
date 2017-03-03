@@ -19,7 +19,8 @@ class MetaGeneratorSpec extends FunSpec
 
   def parseFile(fileName: String) = new TypeResolver()(parser.parseFile(fileName))
 
-  lazy val resolvedDocument = parseFile("simple.thrift") // default resolved document
+  val fileName = new java.io.File("simple.thrift")
+  lazy val resolvedDocument = parseFile(fileName.getPath) // default resolved document
 
   lazy val document = resolvedDocument.document
 
@@ -54,7 +55,7 @@ class MetaGeneratorSpec extends FunSpec
       }
     }
     it("should correctly identify fields") {
-      inside(generator.generateCaseClass(simpleStruct)) {
+      inside(generator.generateCaseClass(simpleStruct, fileName)) {
         case GeneratedCaseClass(Identifier("SimpleStruct"), fields, _) =>
           fields should contain inOrderOnly (
             GeneratedField(Identifier("name"), ScalaType.String, 1),
@@ -64,13 +65,13 @@ class MetaGeneratorSpec extends FunSpec
       }
     }
     it("it should generate package with multiple structs") {
-      inside(generator.generatePackage(resolvedDocument, None)) {
+      inside(generator.generatePackage(resolvedDocument, fileName)) {
         case Seq(GeneratedPackage(caseClasses, _)) =>
           caseClasses should have size 3
       }
     }
     it("it should handle nested structs") {
-      inside(generator.generatePackage(resolvedDocument, None).headOption) {
+      inside(generator.generatePackage(resolvedDocument, fileName).headOption) {
         case Some(GeneratedPackage(caseClasses,_)) =>
           val nested = caseClasses.find(_.name == Identifier("HasNested")).value
           inside(nested) {
@@ -83,7 +84,7 @@ class MetaGeneratorSpec extends FunSpec
       }
     }
     it("should correctly handle enum definitions") {
-      inside(generator.generatePackage(parseFile("hasEnum.thrift"), None).headOption) {
+      inside(generator.generatePackage(parseFile("hasEnum.thrift"), fileName).headOption) {
         case Some(GeneratedPackage(defns, _)) =>
           defns should have size 1
           inside(defns.headOption) {
@@ -96,22 +97,22 @@ class MetaGeneratorSpec extends FunSpec
       }
     }
     it("should include data from included files") {
-      inside(generator.generatePackage(resolvedDocument, None, recurse = true).headOption) {
+      inside(generator.generatePackage(resolvedDocument, fileName, recurse = true).headOption) {
         case Some(GeneratedPackage(caseClasses, _)) =>
           caseClasses.find(_.name == Identifier("IncludedStruct")) shouldBe defined
       }
     }
     it("should only generate a definition once") {
-      forAll(generator.generatePackage(resolvedDocument, None, recurse = true)) { pkg =>
+      forAll(generator.generatePackage(resolvedDocument, fileName, recurse = true)) { pkg =>
         val names = pkg.definitions.map(_.name)
         names should contain theSameElementsAs names.toSet
       }
     }
     it("should honour the namespaces") {
       println(
-        generator.generatePackage(resolvedDocument, None, recurse = true).map(_.generate).mkString("\n")
+        generator.generatePackage(resolvedDocument, recurse = true, fname = fileName).map(_.generate).mkString("\n")
       )
-      generator.generatePackage(resolvedDocument, None, recurse = true).map(_.name) should contain only (
+      generator.generatePackage(resolvedDocument, fname = fileName, recurse = true).map(_.name) should contain only (
         Some(Identifier("simple.test")),
         Some(Identifier("simple.test.included")),
         None
