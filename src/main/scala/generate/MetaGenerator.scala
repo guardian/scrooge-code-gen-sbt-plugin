@@ -93,8 +93,7 @@ case class GeneratedEnumeration(
 }
 case class GeneratedPackage(
   definitions: Set[GeneratedDefinition],
-  name: Option[Identifier] = None,
-  includedNamespaces: Map[String, String] = Map.empty
+  name: Option[Identifier] = None
 ) extends GeneratedCode {
   val definitionsString = definitions.map(_.generate).mkString("\n")
   // add definitions to this package
@@ -137,11 +136,12 @@ class CaseClassGenerator(val packageName: Identifier) {
    * may in fact need to generate more than one case class from this
    * definition. Therefore, we return a map of case classes, keyed off
    * the name, and these can then be merged together */
-  def generateCaseClass(st: scroogeAst.StructLike, fname: File): GeneratedCaseClass =
+  def generateCaseClass(st: scroogeAst.StructLike, fname: File, includedNamespaces: Map[String, String] = Map.empty) =
     GeneratedCaseClass(Identifier(st.sid.name), generateMembers(st), fname)
 
-  def generateDefinition(fname: File): PartialFunction[scroogeAst.Definition, GeneratedDefinition] = {
-    case st: scroogeAst.StructLike => generateCaseClass(st, fname)
+  def generateDefinition(fname: File, includedNamespaces: Map[String, String] = Map.empty):
+      PartialFunction[scroogeAst.Definition, GeneratedDefinition] = {
+    case st: scroogeAst.StructLike => generateCaseClass(st, fname, includedNamespaces)
     case scroogeAst.Enum(name, values, _, _) =>
       GeneratedEnumeration(Identifier(name.fullName),
         SortedSet(values .map(f =>
@@ -168,10 +168,18 @@ class CaseClassGenerator(val packageName: Identifier) {
       } else {
         Nil
       }
+    // this contains a map of the included files to their
+    // namespaces. This is used to qualify references to the included
+    // type, which will appear as `scoped` identifiers in the Scrooge
+    // AST (e.g. in thrift it looks like `shared.Atom`). We will look
+    // up that scope in this map and affix the full package name to
+    // the identifier in the generated scala code.
+    val namespaceMap = includedDocs.collect {
+        case IncludedFileDetails(fname, _, Some(namespace)) => fname -> namespace
+      }.toMap
     val packages = GeneratedPackage(generateDefinitions(rdoc, recurse, fname), packageName) +:
       includedDocs.flatMap {
-        case IncludedFileDetails(includedFname, rdoc, namespace) =>
-          println(s"[PMR 1658] processing included file $fname => $includedFname :: ${Some(new File(includedFname))}")
+        case IncludedFileDetails(includedFname, rdoc, _) =>
           generatePackage(rdoc, new File(includedFname), recurse)
       }
     // merge the packages so that each one appears only once (and

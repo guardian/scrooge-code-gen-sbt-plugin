@@ -40,6 +40,15 @@ class MetaGeneratorSpec extends FunSpec
 
   lazy val generator = new CaseClassGenerator(Identifier("SimpleTest"))
 
+  // returns the first instance of a field that matches identifier
+  def findGeneratedField(id: Identifier, pkgs: Seq[GeneratedPackage]): Option[GeneratedField] =
+    (for {
+        pkg <- pkgs
+        GeneratedCaseClass(_, fields, _) <- pkg.definitions
+        field <- fields
+        if field.name == id
+      } yield field).headOption
+
   describe("MetaGenerator") {
     it("should correctly choose field type") {
       generator.genType(nameField.fieldType) should be(ScalaType.String)
@@ -72,7 +81,7 @@ class MetaGeneratorSpec extends FunSpec
     }
     it("it should handle nested structs") {
       inside(generator.generatePackage(resolvedDocument, fileName).headOption) {
-        case Some(GeneratedPackage(caseClasses,_)) =>
+        case Some(GeneratedPackage(caseClasses, _)) =>
           val nested = caseClasses.find(_.name == Identifier("HasNested")).value
           inside(nested) {
             case GeneratedCaseClass(Identifier("HasNested"), fields, _) =>
@@ -97,9 +106,8 @@ class MetaGeneratorSpec extends FunSpec
       }
     }
     it("should include data from included files") {
-      inside(generator.generatePackage(resolvedDocument, fileName, recurse = true).headOption) {
-        case Some(GeneratedPackage(caseClasses, _)) =>
-          caseClasses.find(_.name == Identifier("IncludedStruct")) shouldBe defined
+      forAtLeast(1, generator.generatePackage(resolvedDocument, fileName, recurse = true)) { pkg =>
+        pkg.definitions.find(_.name == Identifier("IncludedStruct")) shouldBe defined
       }
     }
     it("should only generate a definition once") {
@@ -109,14 +117,30 @@ class MetaGeneratorSpec extends FunSpec
       }
     }
     it("should honour the namespaces") {
-      println(
-        generator.generatePackage(resolvedDocument, recurse = true, fname = fileName).map(_.generate).mkString("\n")
-      )
       generator.generatePackage(resolvedDocument, fname = fileName, recurse = true).map(_.name) should contain only (
         Some(Identifier("simple.test")),
         Some(Identifier("simple.test.included")),
         None
       )
+    }
+    it("should correctly qualify refs to types from included files") {
+      val field = findGeneratedField(Identifier("otherFile"),
+          generator.generatePackage(resolvedDocument, fname = fileName, recurse = true)
+        ).value
+      field.scalaType should matchPattern {
+        case ScalaType.CustomType(Identifier("simple.test.included.IncludedStruct")) =>
+      }
+    //   val pkgs = generator.generatePackage(resolvedDocument, fname = fileName, recurse = true)
+    //   forExactly(1, pkgs) { pkg =>
+    //     inside(pkg) {
+    //       case p @ GeneratedPackage(defs, Some(Identifier("simple.test"))) =>
+    //         forExactly(1, defs) { defn =>
+    //           inside(defn) { case => GeneratedCaseClass(Identifer("HasNested", fields, _)
+    //             inside(
+    //     }).value
+    //   inside(defn) {
+    //     case GeneratedCaseClass(_, 
+    // }
     }
   }
 }
