@@ -91,7 +91,11 @@ case class GeneratedEnumeration(
   lazy val fieldStr = fields.toSeq.map(f => f.generate)
   lazy val generate = s"""object ${name.generate} extends scala.Enumeration { ${fieldStr.mkString("; ")} }"""
 }
-case class GeneratedPackage(definitions: Set[GeneratedDefinition], name: Option[Identifier] = None) extends GeneratedCode {
+case class GeneratedPackage(
+  definitions: Set[GeneratedDefinition],
+  name: Option[Identifier] = None,
+  includedNamespaces: Map[String, String] = Map.empty
+) extends GeneratedCode {
   val definitionsString = definitions.map(_.generate).mkString("\n")
   // add definitions to this package
   def `+`(newDefinition: GeneratedDefinition): GeneratedPackage =
@@ -145,28 +149,30 @@ class CaseClassGenerator(val packageName: Identifier) {
         ): _*), fname)
   }
 
-  def generateDefinitions(doc: ResolvedDocument, recurse: Boolean, fname: File): Set[GeneratedDefinition] = {
-    val local = doc.document.defs.collect(generateDefinition(fname))
-    (local ++ (if(recurse) {
-      (doc.document.headers collect {
-        case scroogeAst.Include(_, includedDoc) => generateDefinitions(doc.resolver(includedDoc), recurse, fname)
-      }).flatten
-    } else Nil)).toSet
-  }
+  def generateDefinitions(doc: ResolvedDocument, recurse: Boolean, fname: File): Set[GeneratedDefinition] =
+    doc.document.defs.collect(generateDefinition(fname)).toSet
+
+  def docPackageName(doc: scroogeAst.Document): Option[Identifier] =
+    (doc.namespace("scala") orElse doc.namespace("java")).map(id => Identifier(id.fullName))
+
+  case class IncludedFileDetails(fname: String, doc: ResolvedDocument, namespace: Option[Identifier])
 
   def generatePackage(rdoc: ResolvedDocument, fname: File, recurse: Boolean = false): Seq[GeneratedPackage] = {
-    val packageName = (rdoc.document.namespace("scala") orElse rdoc.document.namespace("java"))
-      .map(id => Identifier(id.fullName))
-    val includedDocs = if(recurse) {
+    val packageName = docPackageName(rdoc.document)
+    val includedDocs =
+      if(recurse) {
         rdoc.document.headers.collect {
-          case scroogeAst.Include(fname, includedDoc) => (fname, rdoc.resolver(includedDoc))
+          case scroogeAst.Include(fname, includedDoc) =>
+            IncludedFileDetails(fname, rdoc.resolver(includedDoc), docPackageName(includedDoc))
         }
-      } else Nil
+      } else {
+        Nil
+      }
     val packages = GeneratedPackage(generateDefinitions(rdoc, recurse, fname), packageName) +:
-      includedDocs.flatMap { d =>
-        val (includedFname, rdoc) = d
-        println(s"[PMR 1658] processing included file $fname => $includedFname :: ${Some(new File(includedFname))}")
-        generatePackage(rdoc, new File(includedFname), recurse)
+      includedDocs.flatMap {
+        case IncludedFileDetails(includedFname, rdoc, namespace) =>
+          println(s"[PMR 1658] processing included file $fname => $includedFname :: ${Some(new File(includedFname))}")
+          generatePackage(rdoc, new File(includedFname), recurse)
       }
     // merge the packages so that each one appears only once (and
     // thereby removing duplicate entries, which would otherwise
