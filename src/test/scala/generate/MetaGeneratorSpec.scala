@@ -38,7 +38,7 @@ class MetaGeneratorSpec extends FunSpec
   lazy val ageField     = findField("age", simpleStruct).get
   lazy val stringsField = findField(3, simpleStruct).get
 
-  lazy val generator = new CaseClassGenerator(Identifier("SimpleTest"))
+  lazy val generator = new CaseClassGenerator
 
   // returns the first instance of a field that matches identifier
   def findGeneratedField(id: Identifier, pkgs: Seq[GeneratedPackage]): Option[GeneratedField] =
@@ -51,10 +51,10 @@ class MetaGeneratorSpec extends FunSpec
 
   describe("MetaGenerator") {
     it("should correctly choose field type") {
-      generator.genType(nameField.fieldType) should be(ScalaType.String)
+      generator.genType(nameField.fieldType, Map.empty) should be(ScalaType.String)
     }
     it("should handle List type's field type") {
-      generator.genType(stringsField.fieldType) should matchPattern {
+      generator.genType(stringsField.fieldType, Map.empty) should matchPattern {
         case ScalaType.List(ScalaType.String) =>
       }
     }

@@ -109,11 +109,11 @@ case class GeneratedPackage(
   }
 }
 
-class CaseClassGenerator(val packageName: Identifier) {
+class CaseClassGenerator {
 
-  type IncludedTypesMap = Map[String, String]
+  type IncludedTypesMap = Map[String, Option[String]]
 
-  def genType(t: scroogeAst.FunctionType, includedMap: IncludedTypesMap = Map.empty): ScalaType = t match {
+  def genType(t: scroogeAst.FunctionType, includedMap: IncludedTypesMap): ScalaType = t match {
       case scroogeAst.TBool => ScalaType.Boolean
       case scroogeAst.TByte => ScalaType.Byte
       case scroogeAst.TI16 => ScalaType.Short
@@ -121,13 +121,19 @@ class CaseClassGenerator(val packageName: Identifier) {
       case scroogeAst.TI64 => ScalaType.Long
       case scroogeAst.TDouble => ScalaType.Double
       case scroogeAst.TString => ScalaType.String
-      case scroogeAst.ListType(elementType, _) => ScalaType.List(genType(elementType))
+      case scroogeAst.ListType(elementType, _) => ScalaType.List(genType(elementType, includedMap))
       case scroogeAst.StructType(st, scoped) =>
         val typeName = scoped.map { scope =>
             // should fail if we do have a scope but it isn't the map,
             // because that would mean we don't actually have a
             // defintion of this struct
-            includedMap(scope.name) + "." + st.sid.name
+            includedMap.get(scope.name) match {
+              case Some(Some(nm)) => nm + "." + st.sid.name
+              case Some(None) => st.sid.name
+              case None => throw new IllegalArgumentException(
+                s"Missing include file referenced as ${scope.name}, from " + includedMap.keys.mkString(", ")
+              )
+            }
           } getOrElse st.sid.name
         ScalaType.CustomType(Identifier(typeName))
       case scroogeAst.EnumType(enum, _) => ScalaType.CustomType(EnumValueIdentifier(Identifier(enum.sid.name)))
@@ -166,14 +172,13 @@ class CaseClassGenerator(val packageName: Identifier) {
   def docPackageName(doc: scroogeAst.Document): Option[Identifier] =
     (doc.namespace("scala") orElse doc.namespace("java")).map(id => Identifier(id.fullName))
 
-  case class IncludedFileDetails(fname: String, doc: ResolvedDocument, namespace: Identifier)
+  case class IncludedFileDetails(fname: String, doc: ResolvedDocument, namespace: Option[Identifier])
 
   def generatePackage(rdoc: ResolvedDocument, fname: File, recurse: Boolean = false): Seq[GeneratedPackage] = {
     val includedDocs =
         rdoc.document.headers.collect {
           case scroogeAst.Include(fname, includedDoc) =>
-            println(s"[PMR 1752] $fname => ${docPackageName(includedDoc)}")
-            IncludedFileDetails(fname, rdoc.resolver(includedDoc), docPackageName(includedDoc).getOrElse(Identifier("_root_")))
+            IncludedFileDetails(fname, rdoc.resolver(includedDoc), docPackageName(includedDoc))
         }
     // this contains a map of the included files to their
     // namespaces. This is used to qualify references to the included
@@ -184,10 +189,9 @@ class CaseClassGenerator(val packageName: Identifier) {
     val namespaceMap: IncludedTypesMap = includedDocs.collect {
         case IncludedFileDetails(fname, _, namespace) =>
           val key = (new File(fname).getName).replaceAll("\\.[^.]+$", "")
-          println(s"[PMR 1728] $key ${namespace.generate}")
-          key -> namespace.generate
+          key -> namespace.map(_.generate)
       }.toMap
-    val packages = GeneratedPackage(generateDefinitions(rdoc, recurse, fname, namespaceMap), Some(packageName)) +:
+    val packages = GeneratedPackage(generateDefinitions(rdoc, recurse, fname, namespaceMap), docPackageName(rdoc.document)) +:
       (if(recurse) {
         includedDocs.flatMap {
           case IncludedFileDetails(includedFname, rdoc, _) =>

@@ -60,12 +60,11 @@ object ThriftTransformerSBT extends AutoPlugin {
       val importer = Importer(thriftTransformThriftDirs.value.map(_.getCanonicalPath)) +: classpathImporter
       val parser = new ThriftParser(importer, false)
       val resolver = new TypeResolver()
-      val generator = new CaseClassGenerator(Identifier(thriftTransformPackageName.value))
+      val generator = new CaseClassGenerator
       val docs = thriftTransformThriftFiles.value.map { f =>
         (f, resolver(parser.parseFile(f.getPath)))
       }
       val packages = docs.flatMap { case (fname, resolvedDoc) =>
-          println(s"[PMR 1652] SBT => ${fname}")
           generator.generatePackage(resolvedDoc, recurse = true, fname = fname)
         }
       packages foreach { p =>
