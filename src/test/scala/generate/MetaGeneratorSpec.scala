@@ -130,17 +130,13 @@ class MetaGeneratorSpec extends FunSpec
       field.scalaType should matchPattern {
         case ScalaType.CustomType(Identifier("simple.test.included.IncludedStruct")) =>
       }
-    //   val pkgs = generator.generatePackage(resolvedDocument, fname = fileName, recurse = true)
-    //   forExactly(1, pkgs) { pkg =>
-    //     inside(pkg) {
-    //       case p @ GeneratedPackage(defs, Some(Identifier("simple.test"))) =>
-    //         forExactly(1, defs) { defn =>
-    //           inside(defn) { case => GeneratedCaseClass(Identifer("HasNested", fields, _)
-    //             inside(
-    //     }).value
-    //   inside(defn) {
-    //     case GeneratedCaseClass(_, 
-    // }
+    }
+    it("should apply a transform to the namespace when provided") {
+      new CaseClassGenerator(_.replaceFirst("^simple", "modified"))
+        .generatePackage(resolvedDocument, fname = fileName, recurse = false)
+        .headOption.value should matchPattern {
+        case GeneratedPackage(_, Some(Identifier("modified.test"))) =>
+      }
     }
   }
 }

@@ -17,12 +17,13 @@ import Classpaths.managedJars
 
 object ThriftTransformerSBT extends AutoPlugin {
   object autoImport {
-    val thriftTransformPackageName  = settingKey[String]("package to which the generated code should belong")
-    val thriftTransformThriftDirs   = settingKey[Seq[File]]("directories to be search for thrift files")
-    val thriftTransformThriftFiles  = settingKey[Seq[File]]("files (from within the search path thriftTransformPackageName), from which code should be generated")
-    val thriftTransformSourceDir    = settingKey[File]("where will the generated source code be written to form part of the build?")
-    val thriftTransformUseClassPath = settingKey[Boolean]("should we (also?) search in the class path when resolving thrift files?")
-    val generateTransformedThrift   = taskKey[Seq[File]]("generate the requested code from the thrift file(s)")
+    val thriftTransformPackageName     = settingKey[String]("package to which the generated code should belong")
+    val thriftTransformThriftDirs      = settingKey[Seq[File]]("directories to be search for thrift files")
+    val thriftTransformThriftFiles     = settingKey[Seq[File]]("files (from within the search path thriftTransformPackageName), from which code should be generated")
+    val thriftTransformSourceDir       = settingKey[File]("where will the generated source code be written to form part of the build?")
+    val thriftTransformUseClassPath    = settingKey[Boolean]("should we (also?) search in the class path when resolving thrift files?")
+    val thriftTransformChangeNamespace = settingKey[(String) => (String)]("function that will be applied to each generated package's namespace")
+    val generateTransformedThrift      = taskKey[Seq[File]]("generate the requested code from the thrift file(s)")
   }
   import autoImport._
 
@@ -47,12 +48,13 @@ object ThriftTransformerSBT extends AutoPlugin {
   override lazy val requires = sbt.plugins.JvmPlugin
   override lazy val trigger = allRequirements
   override lazy val projectSettings = Seq(
-    thriftTransformPackageName  := "thrift_transformed",
-    thriftTransformThriftDirs   := Seq(baseDirectory.value / "src" / "main" / "thrift"),
-    thriftTransformThriftFiles  := Seq(file("set_in_scala_repo")),
-    thriftTransformSourceDir    := sourceManaged.value / "thriftTransform" / "src",
-    thriftTransformUseClassPath := true,
-    generateTransformedThrift   := {
+    thriftTransformPackageName     := "thrift_transformed",
+    thriftTransformThriftDirs      := Seq(baseDirectory.value / "src" / "main" / "thrift"),
+    thriftTransformThriftFiles     := Seq(file("set_in_scala_repo")),
+    thriftTransformSourceDir       := sourceManaged.value / "thriftTransform" / "src",
+    thriftTransformUseClassPath    := true,
+    thriftTransformChangeNamespace := identity, // no change to namespace by default
+    generateTransformedThrift      := {
       val classpathImporter = if(thriftTransformUseClassPath.value)
           buildClasspathImporter(managedJars(Compile, classpathTypes.value, update.value).map(_.data))
         else
@@ -60,7 +62,7 @@ object ThriftTransformerSBT extends AutoPlugin {
       val importer = Importer(thriftTransformThriftDirs.value.map(_.getCanonicalPath)) +: classpathImporter
       val parser = new ThriftParser(importer, false)
       val resolver = new TypeResolver()
-      val generator = new CaseClassGenerator
+      val generator = new CaseClassGenerator(thriftTransformChangeNamespace.value)
       val docs = thriftTransformThriftFiles.value.map { f =>
         (f, resolver(parser.parseFile(f.getPath)))
       }
