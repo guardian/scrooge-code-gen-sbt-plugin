@@ -69,14 +69,6 @@ object ThriftTransformerSBT extends AutoPlugin {
       val packages = docs.flatMap { case (fname, resolvedDoc) =>
           generator.generatePackage(resolvedDoc, recurse = true, fname = fname)
         }
-      packages foreach { p =>
-        println(p.name.map(_.generate).getOrElse("_root_"))
-        p.definitions foreach { defn =>
-          if(defn.name == Identifier("Asset")) {
-            println(s"   `- ${defn.name.generate} from ${defn.definedIn}")
-          }
-        }
-      }
       // write each document out to a file, returning the filename (as File())
       packages.zipWithIndex map { case (srcFile, index) =>
         val fname = thriftTransformSourceDir.value / s"${thriftTransformPackageName.value}$index.scala"
