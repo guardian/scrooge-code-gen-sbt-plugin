@@ -31,3 +31,9 @@ thriftTransformChangeNamespace := { (orig: String) => orig.replaceFirst("^prefix
 ```
 
 would change a namespace that begins with "prefix.\*" to "modified.\*"
+
+## TODO
+
++ [ ] Properly name the genreated thrift files so that they don't
+  clash, and so that we can remove the otherwise unused
+  `thriftTransformPackageName` setting
