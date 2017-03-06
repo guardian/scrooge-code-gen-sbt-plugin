@@ -109,7 +109,11 @@ case class GeneratedPackage(
   }
 }
 
-class CaseClassGenerator {
+/*
+ * transformNamespace can be used to transform the package name once
+ * it is generated
+ */
+class CaseClassGenerator(transformNamespace: String => String = identity) {
 
   type IncludedTypesMap = Map[String, Option[String]]
 
@@ -170,7 +174,9 @@ class CaseClassGenerator {
     doc.document.defs.collect(generateDefinition(fname, includeMap)).toSet
 
   def docPackageName(doc: scroogeAst.Document): Option[Identifier] =
-    (doc.namespace("scala") orElse doc.namespace("java")).map(id => Identifier(id.fullName))
+    (doc.namespace("scala") orElse doc.namespace("java")).map(
+      id => Identifier(transformNamespace(id.fullName)) // applies the namespace transformer if present
+    )
 
   case class IncludedFileDetails(fname: String, doc: ResolvedDocument, namespace: Option[Identifier])
 
