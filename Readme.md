@@ -1,7 +1,7 @@
 # Scrooge code gen sbt plugin
 
-This SBT plugin will take a thrift definition and case class for each
-definition that has all optional fields.
+This SBT plugin will take a thrift definition and generate a case
+class for each definition, with all optional fields.
 
 For examples of how to use it see the tests in `src/sbt-test`, but in
 summary: either put your thrift files in `src/main/thrift` or make
@@ -30,4 +30,4 @@ will be applied to each namespace. E.g:
 thriftTransformChangeNamespace := { (orig: String) => orig.replaceFirst("^prefix.", "modified.") }
 ```
 
-would change a namespace that begins with "prefix.*" to "modified.*".
+would change a namespace that begins with "prefix.\*" to "modified.\*"
