@@ -1,15 +1,15 @@
-
 sbtPlugin := true
 
-lazy val commonSettings = Seq(
-  scalaVersion := "2.11.8",
-  libraryDependencies ++= Seq(
-    "com.twitter"         %% "scrooge-generator"         % "4.13.0",
-    "org.scalameta"       %% "scalameta"                 % "1.4.0",
-    "com.gu"               % "content-atom-model-thrift" % "2.4.31",
-    "com.geirsson"        %% "scalafmt"                  % "0.5.2-RC1"
-  )
-)
+scalaVersion := "2.10.6"
 
-lazy val root = (project in file("."))
-  .settings(commonSettings)
+organization := "com.gu"
+
+name := "thrift-transformer-sbt"
+
+version := "0.0.1-SNAPSHOT"
+
+libraryDependencies ++= Seq(
+  "com.twitter"         %% "scrooge-generator"         % "4.13.0",
+  "org.scalatest"       %% "scalatest"                 % "3.0.1"  % "test",
+  "com.gu"               % "content-atom-model-thrift" % "2.4.31" % "test"
+)

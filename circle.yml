@@ -1,0 +1,5 @@
+test:
+  override:
+    - sbt test
+    # run the sbt 'scripted' plugin for the sbt plugin test harness
+    - sbt scripted
