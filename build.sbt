@@ -22,7 +22,3 @@ pomExtra := (
 )
 
 licenses := Seq("Apache V2" -> url("http://www.apache.org/licenses/LICENSE-2.0.html"))
-
-import ReleaseTransformations._
-
-releaseProcess -= pushChanges
