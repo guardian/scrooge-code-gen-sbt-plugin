@@ -99,8 +99,8 @@ class MetaGeneratorSpec extends FunSpec
           inside(defns.headOption) {
             case Some(GeneratedEnumeration(Identifier("TestEnum"), fields, _)) =>
               fields should contain only (
-                GeneratedEnumField(Identifier("good"), 1),
-                GeneratedEnumField(Identifier("bad"),  2)
+                GeneratedEnumField(Identifier("good"), 1, Identifier("TestEnum")),
+                GeneratedEnumField(Identifier("bad"),  2, Identifier("TestEnum"))
               )
           }
       }
