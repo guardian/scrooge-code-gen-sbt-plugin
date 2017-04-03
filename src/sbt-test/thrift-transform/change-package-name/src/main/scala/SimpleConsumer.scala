@@ -7,5 +7,5 @@ import modified.rest._
 class SimpleConsumer {
   val x1 = SimpleStruct(name = None, age = Some(10))
   val x2 = OtherSimpleStruct(number = Some(5.6))
-  val e1: SimpleEnum.Value = SimpleEnum.yes
+  val e1: SimpleEnum = SimpleEnum.yes
 }
