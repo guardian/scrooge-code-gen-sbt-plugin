@@ -19,6 +19,18 @@ scmInfo := Some(ScmInfo(url("https://github.com/guardian/content-atom"),
 
 pomExtra := (
   <url>https://github.com/guardian/scrooge-code-gen-sbt-plugin</url>
+  <developers>
+    <developer>
+      <id>paulmr</id>
+      <name>Paul Roberts</name>
+      <url>https://github.com/paulmr</url>
+    </developer>
+    <developer>
+      <id>susiecoleman</id>
+      <name>Susie Coleman</name>
+      <url>https://github.com/susiecoleman</url>
+    </developer>
+  </developers>
 )
 
 licenses := Seq("Apache V2" -> url("http://www.apache.org/licenses/LICENSE-2.0.html"))
