@@ -8,4 +8,7 @@ class SimpleConsumer {
   val x1 = SimpleStruct(name = None, age = Some(10))
   val x2 = OtherSimpleStruct(number = Some(5.6))
   val e1: SimpleEnum = SimpleEnum.Yes
+  val e2: Option[SimpleEnum] = SimpleEnum.valueOf("yes")
+  val e3: SimpleEnum = e2.get
+  val e4: Option[SimpleEnum] = SimpleEnum.valueOf("other")
 }
