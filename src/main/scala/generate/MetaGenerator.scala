@@ -88,12 +88,23 @@ case class GeneratedEnumeration(
   fields: SortedSet[GeneratedEnumField],
   definedIn: File
 ) extends GeneratedDefinition {
+
+  def generateMatchCase(field: GeneratedEnumField): String = {
+    val name = field.name.generate
+    s"""case "${name.toLowerCase}" => Some(${name.toLowerCase.capitalize})"""
+  }
+
   lazy val fieldStr = fields.toSeq.map(f => f.generate)
-  lazy val generate =
-    s"""sealed trait ${name.generate} {val identifier: Int} \n
+  lazy val matchCases = fields.map(f => generateMatchCase(f))
+  lazy val generate = s"""sealed trait ${name.generate} {val identifier: Int} \n
        | object ${name.generate} { \n
-       | ${fieldStr.mkString("; ")} }""".stripMargin
+       | ${fieldStr.mkString("; ")} \n
+       | def valueOf(name: String): Option[${name.generate}] = name.toLowerCase match { \n
+       | ${matchCases.mkString("\n")} \n
+       | case _ => None } \n
+       | }""".stripMargin
 }
+
 case class GeneratedPackage(
   definitions: Set[GeneratedDefinition],
   name: Option[Identifier] = None
